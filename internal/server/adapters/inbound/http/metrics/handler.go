@@ -72,6 +72,9 @@ func (h *Handler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, metric.ErrInvalidMetricType):
 		w.WriteHeader(http.StatusBadRequest)
 		return
+	case errors.Is(err, metric.ErrInvalidMetricValue):
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}
