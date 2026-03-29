@@ -19,7 +19,7 @@ type counterRecord struct {
 }
 
 type MemStorage struct {
-	mu      sync.RWMutex
+	mu      sync.Mutex
 	gauges  map[string]gaugeRecord
 	counter map[string]counterRecord
 }
@@ -32,9 +32,9 @@ func NewMemStorage() *MemStorage {
 }
 
 func (m *MemStorage) GetGaugeByName(name metric.Name) (*metric.Gauge, error) {
-	m.mu.RLock()
+	m.mu.Lock()
 	record, ok := m.gauges[string(name)]
-	m.mu.RUnlock()
+	defer m.mu.Unlock()
 
 	if !ok {
 		return nil, nil
@@ -63,9 +63,9 @@ func (m *MemStorage) SaveGauge(gauge *metric.Gauge) error {
 }
 
 func (m *MemStorage) GetCounterByName(name metric.Name) (*metric.Counter, error) {
-	m.mu.RLock()
+	m.mu.Lock()
 	record, ok := m.counter[string(name)]
-	m.mu.RUnlock()
+	defer m.mu.Unlock()
 
 	if !ok {
 		return nil, nil

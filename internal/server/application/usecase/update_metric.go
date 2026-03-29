@@ -33,7 +33,7 @@ func (u *UpdateMetric) Execute(cmd UpdateMetricCommand) error {
 	case "gauge":
 		return u.updateGauge(name, cmd.Value)
 	case "counter":
-		return u.updateGauge(name, cmd.Value)
+		return u.updateCounter(name, cmd.Value)
 	default:
 		return metric.ErrUnsupportedMetricType
 	}
