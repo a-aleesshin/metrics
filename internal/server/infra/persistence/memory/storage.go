@@ -3,6 +3,7 @@ package memory
 import (
 	"sync"
 
+	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
 )
 
@@ -91,4 +92,60 @@ func (m *MemStorage) SaveCounter(counter *metric.Counter) error {
 	}
 
 	return nil
+}
+
+func (m *MemStorage) ListCounters() ([]repository.CounterSnapshot, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	out := make([]repository.CounterSnapshot, 0, len(m.counter))
+
+	for _, cointer := range m.counter {
+		out = append(out, repository.CounterSnapshot{
+			Name:  cointer.Name,
+			Delta: cointer.Delta,
+		})
+	}
+
+	return out, nil
+}
+
+func (m *MemStorage) ListGauges() ([]repository.GaugeSnapshot, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	out := make([]repository.GaugeSnapshot, 0, len(m.gauges))
+
+	for _, gauge := range m.gauges {
+		out = append(out, repository.GaugeSnapshot{
+			Name:  gauge.Name,
+			Value: gauge.Value,
+		})
+	}
+
+	return out, nil
+}
+
+func (m *MemStorage) FindGaugeByName(name metric.Name) (value float64, found bool, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	rec, ok := m.gauges[name.String()]
+	if !ok {
+		return 0, false, nil
+	}
+
+	return rec.Value, true, nil
+}
+
+func (m *MemStorage) FindCounterByName(name metric.Name) (delta int64, found bool, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	rec, ok := m.counter[name.String()]
+	if !ok {
+		return 0, false, nil
+	}
+
+	return rec.Delta, true, nil
 }

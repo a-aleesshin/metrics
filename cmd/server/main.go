@@ -4,17 +4,26 @@ import (
 	"log"
 	"net/http"
 
-	inboundhttp "github.com/a-aleesshin/metrics/internal/server/adapters/inbound/http"
-	"github.com/a-aleesshin/metrics/internal/server/adapters/inbound/http/metrics"
-	"github.com/a-aleesshin/metrics/internal/server/adapters/outbound/persistence/memory"
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
+	"github.com/a-aleesshin/metrics/internal/server/infra/persistence/memory"
+	"github.com/a-aleesshin/metrics/internal/server/transport/http/metrics"
+	sharedrouter "github.com/a-aleesshin/metrics/internal/shared/router"
 )
 
 func main() {
 	storage := memory.NewMemStorage()
+
 	updateMetrics := usecase.NewUpdateMetric(storage)
-	metricsHandler := metrics.NewHandler(updateMetrics)
-	router := inboundhttp.NewRouter(metricsHandler)
+	getValueMetric := usecase.NewGetValueMetricUseCase(storage)
+	listMetrics := usecase.NewListMetricUseCase(storage)
+
+	metricsHandler := metrics.NewHandler(
+		updateMetrics,
+		getValueMetric,
+		listMetrics,
+	)
+
+	router := sharedrouter.New(metricsHandler)
 
 	server := &http.Server{
 		Addr:    ":8080",

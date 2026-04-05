@@ -1,12 +1,14 @@
 package metrics
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
+	"github.com/go-chi/chi/v5"
 )
 
 type updateMetricUseCaseSpy struct {
@@ -21,6 +23,15 @@ func (u *updateMetricUseCaseSpy) Execute(command usecase.UpdateMetricCommand) er
 	return u.err
 }
 
+func withChiParams(r *http.Request, params map[string]string) *http.Request {
+	rc := chi.NewRouteContext()
+	for k, v := range params {
+		rc.URLParams.Add(k, v)
+	}
+	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, rc)
+	return r.WithContext(ctx)
+}
+
 func TestHandler_Update_ErrorMapping(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -29,17 +40,6 @@ func TestHandler_Update_ErrorMapping(t *testing.T) {
 		wantStatusCode int
 		wantCommand    usecase.UpdateMetricCommand
 	}{
-		{
-			name:           "name empty returns 404",
-			path:           "/update/gauge//123.45",
-			useCaseErr:     metric.ErrNameEmpty,
-			wantStatusCode: http.StatusNotFound,
-			wantCommand: usecase.UpdateMetricCommand{
-				Type:  "gauge",
-				Name:  "",
-				Value: "123.45",
-			},
-		},
 		{
 			name:           "unsupported metric type returns 400",
 			path:           "/update/unknown/Alloc/123.45",
@@ -78,18 +78,17 @@ func TestHandler_Update_ErrorMapping(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			useCaseSpy := &updateMetricUseCaseSpy{
-				err: tt.useCaseErr,
-			}
-			handler := NewHandler(useCaseSpy)
+			useCaseSpy := &updateMetricUseCaseSpy{err: tt.useCaseErr}
+			handler := NewHandler(useCaseSpy, valueUseCaseNoop{}, listUseCaseNoop{})
+
+			r := chi.NewRouter()
+			r.Post("/update/{type}/{name}/{value}", handler.Update)
 
 			req := httptest.NewRequest(http.MethodPost, tt.path, nil)
-			req.Header.Set("Content-Type", "text/plain")
-
 			rec := httptest.NewRecorder()
 
 			// Act
-			handler.Update(rec, req)
+			r.ServeHTTP(rec, req)
 
 			// Assert
 			if rec.Code != tt.wantStatusCode {
