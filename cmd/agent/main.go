@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/a-aleesshin/metrics/internal/agent/adapters/inbound/runner"
-	httpadapter "github.com/a-aleesshin/metrics/internal/agent/adapters/outbound/http"
-	"github.com/a-aleesshin/metrics/internal/agent/adapters/outbound/persistence/memory"
-	randomadapter "github.com/a-aleesshin/metrics/internal/agent/adapters/outbound/random"
-	runtimeadapter "github.com/a-aleesshin/metrics/internal/agent/adapters/outbound/runtime"
 	"github.com/a-aleesshin/metrics/internal/agent/application/usecase"
+	"github.com/a-aleesshin/metrics/internal/agent/infra/http"
+	"github.com/a-aleesshin/metrics/internal/agent/infra/persistence/memory"
+	"github.com/a-aleesshin/metrics/internal/agent/infra/random"
+	"github.com/a-aleesshin/metrics/internal/agent/infra/runtime"
+	"github.com/a-aleesshin/metrics/internal/agent/transport/runner"
 )
 
 func main() {
