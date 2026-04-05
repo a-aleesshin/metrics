@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/a-aleesshin/metrics/internal/agent/application/dto"
 )
@@ -15,7 +16,7 @@ type MetricSender struct {
 
 func NewMetricSender(url string, HTTPClient *http.Client) *MetricSender {
 	return &MetricSender{
-		url:    url,
+		url:    normalizeBaseURL(url),
 		client: HTTPClient,
 	}
 }
@@ -52,4 +53,11 @@ func (m *MetricSender) Send(dto dto.MetricDTO) error {
 	}
 
 	return nil
+}
+
+func normalizeBaseURL(addr string) string {
+	if strings.HasPrefix(addr, "http://") || strings.HasPrefix(addr, "https://") {
+		return addr
+	}
+	return "http://" + addr
 }
