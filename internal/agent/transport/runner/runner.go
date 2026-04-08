@@ -1,10 +1,9 @@
 package runner
 
 import (
+	"context"
 	"time"
 )
-
-// TODO протестирую позже, когда вынесу time.NewTicker и создам фабрику которую будет получать runner
 
 type CollectMetricsExecutor interface {
 	Execute() error
@@ -35,15 +34,17 @@ func NewAgentRunner(
 	}
 }
 
-func (r *AgentRunner) Run() error {
-	tickerFirst := time.NewTicker(r.reportInterval * time.Second)
-	tickerSecond := time.NewTicker(r.pollInterval * time.Second)
+func (r *AgentRunner) Run(ctx context.Context) error {
+	tickerFirst := time.NewTicker(r.reportInterval)
+	tickerSecond := time.NewTicker(r.pollInterval)
 
 	defer tickerFirst.Stop()
 	defer tickerSecond.Stop()
 
 	for {
 		select {
+		case <-ctx.Done():
+			return nil
 		case <-tickerFirst.C:
 			err := r.reportUseCase.Execute()
 

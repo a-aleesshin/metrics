@@ -3,10 +3,47 @@ package httpadapter
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/a-aleesshin/metrics/internal/agent/application/dto"
 )
+
+func TestMetricSender_Send_NormalizesAddressWithoutScheme(t *testing.T) {
+	// Arrange
+	var gotPath string
+	var gotMethod string
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	addrWithoutScheme := strings.TrimPrefix(ts.URL, "http://")
+	sender := NewMetricSender(addrWithoutScheme, ts.Client())
+
+	// Act
+	err := sender.Send(dto.MetricDTO{
+		Type:  "gauge",
+		Name:  "Alloc",
+		Value: "123.45",
+	})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotMethod != http.MethodPost {
+		t.Fatalf("expected method POST, got %s", gotMethod)
+	}
+
+	if gotPath != "/update/gauge/Alloc/123.45" {
+		t.Fatalf("unexpected path: %s", gotPath)
+	}
+}
 
 func TestMetricSender_Send(t *testing.T) {
 	tests := []struct {
