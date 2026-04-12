@@ -3,55 +3,102 @@ package cli
 import (
 	"flag"
 	"fmt"
-	"io"
+	"os"
 	"strconv"
 	"time"
 )
 
 type AgentConfig struct {
-	Address        string
+	Address        string `env:"ADDRESS"`
 	ReportInterval time.Duration
 	PollInterval   time.Duration
 }
 
-func ParseConfig(args []string) (AgentConfig, error) {
-	cfg := AgentConfig{
-		Address:        "localhost:8080",
-		ReportInterval: 10 * time.Second,
-		PollInterval:   2 * time.Second,
-	}
+var (
+	addressDefault        = "localhost:8080"
+	reportIntervalDefault = 10
+	pollIntervalDefault   = 2
+)
+
+func LoadConfig(args []string) (*AgentConfig, error) {
+	var config AgentConfig
 
 	fs := flag.NewFlagSet("agent", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
 
-	var reportSec string
-	var pollSec string
+	var address string
+	var reportInterval int
+	var pollInterval int
 
-	fs.StringVar(&cfg.Address, "a", cfg.Address, "HTTP server address")
-	fs.StringVar(&reportSec, "r", "10", "report interval in seconds")
-	fs.StringVar(&pollSec, "p", "2", "poll interval in seconds")
+	fs.StringVar(&address, "a", addressDefault, "HTTP server address")
+	fs.IntVar(&reportInterval, "r", reportIntervalDefault, "report interval in seconds")
+	fs.IntVar(&pollInterval, "p", pollIntervalDefault, "poll interval in seconds")
 
 	err := fs.Parse(args)
 
 	if err != nil {
-		return AgentConfig{}, fmt.Errorf("failed to parse config: %w", err)
+		return nil, fmt.Errorf("failed to parse command line arguments: %w", err)
 	}
 
-	r, err := strconv.Atoi(reportSec)
+	valueAddress, err := getStringValue(&address, "ADDRESS")
 
-	if err != nil || r <= 0 {
-		return AgentConfig{}, fmt.Errorf("failed to parse report interval: %w", err)
+	if err != nil {
+		return nil, err
 	}
 
-	p, err := strconv.Atoi(pollSec)
+	config.Address = valueAddress
 
-	if err != nil || p <= 0 {
-		return AgentConfig{}, fmt.Errorf("failed to parse poll interval: %w", err)
+	valueReportInterval, err := getIntValue(&reportInterval, "REPORT_INTERVAL")
 
+	if err != nil {
+		return nil, err
 	}
 
-	cfg.ReportInterval = time.Duration(r) * time.Second
-	cfg.PollInterval = time.Duration(p) * time.Second
+	config.ReportInterval = time.Duration(valueReportInterval) * time.Second
 
-	return cfg, nil
+	valuePollInterval, err := getIntValue(&pollInterval, "POLL_INTERVAL")
+
+	if err != nil {
+		return nil, err
+	}
+
+	config.PollInterval = time.Duration(valuePollInterval) * time.Second
+
+	return &config, nil
+}
+
+func getStringValue(flagValue *string, envName string) (string, error) {
+	envValue := os.Getenv(envName)
+	if envValue != "" {
+		return envValue, nil
+	}
+
+	if flagValue == nil || *flagValue == "" {
+		return "", fmt.Errorf("%s must be set", envName)
+	}
+
+	return *flagValue, nil
+}
+
+func getIntValue(flagValue *int, envName string) (int, error) {
+	envValue := os.Getenv(envName)
+
+	if envValue != "" {
+		val, err := strconv.Atoi(envValue)
+
+		if err != nil {
+			return 0, fmt.Errorf("invalid value for environment variable %s: %w", envName, err)
+		}
+
+		if val <= 0 {
+			return 0, fmt.Errorf("%s must be > 0", envName)
+		}
+
+		return val, nil
+	}
+
+	if flagValue == nil || *flagValue <= 0 {
+		return 0, fmt.Errorf("%s must be > 0", envName)
+	}
+
+	return *flagValue, nil
 }
