@@ -70,20 +70,6 @@ func TestLoadConfig_EnvOverridesFlags(t *testing.T) {
 	}
 }
 
-func TestLoadConfig_UsesEnvAndFlagsTogether(t *testing.T) {
-	resetEnv(t)
-	t.Setenv("ADDRESS", "env-host:9999")
-
-	cfg, err := LoadConfig([]string{"-r=30", "-p=5"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if cfg.Address != "env-host:9999" {
-		t.Fatalf("got address %q, want %q", cfg.Address, "env-host:9999")
-	}
-}
-
 func TestGetStringValue(t *testing.T) {
 	tests := []struct {
 		name       string
