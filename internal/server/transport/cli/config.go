@@ -3,26 +3,52 @@ package cli
 import (
 	"flag"
 	"fmt"
-	"io"
+	"os"
 )
 
 type ServerConfig struct {
-	Address string
+	Address string `env:"ADDRESS"`
 }
 
-func ParseConfig(args []string) (ServerConfig, error) {
-	cfg := ServerConfig{
-		Address: "localhost:8080",
+var (
+	addressDefault = "localhost:8080"
+)
+
+func LoadConfig(args []string) (*ServerConfig, error) {
+	var cfg ServerConfig
+
+	fs := flag.NewFlagSet("agent", flag.ContinueOnError)
+
+	var address string
+
+	fs.StringVar(&address, "a", addressDefault, "HTTP server address")
+
+	err := fs.Parse(args)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse command line arguments: %w", err)
 	}
 
-	fs := flag.NewFlagSet("server", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
+	valueAddress, err := getStringValue(&address, "ADDRESS")
 
-	fs.StringVar(&cfg.Address, "a", cfg.Address, "HTTP server address")
-
-	if err := fs.Parse(args); err != nil {
-		return ServerConfig{}, fmt.Errorf("failed to parse config: %w", err)
+	if err != nil {
+		return nil, err
 	}
 
-	return cfg, nil
+	cfg.Address = valueAddress
+
+	return &cfg, nil
+}
+
+func getStringValue(flagValue *string, envName string) (string, error) {
+	envValue := os.Getenv(envName)
+	if envValue != "" {
+		return envValue, nil
+	}
+
+	if flagValue == nil || *flagValue == "" {
+		return "", fmt.Errorf("%s must be set", envName)
+	}
+
+	return *flagValue, nil
 }
