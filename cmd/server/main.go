@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	flags, err := cli.ParseConfig(os.Args[1:])
+	flags, err := cli.LoadConfig(os.Args[1:])
 
 	if err != nil {
 		log.Fatal("config error: ", err)
