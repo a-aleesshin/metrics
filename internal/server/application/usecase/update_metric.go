@@ -3,6 +3,7 @@ package usecase
 import (
 	"strconv"
 
+	"github.com/a-aleesshin/metrics/internal/shared/port/logger"
 	"github.com/google/uuid"
 
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
@@ -16,14 +17,17 @@ type UpdateMetricCommand struct {
 }
 
 type UpdateMetric struct {
-	repo repository.MetricRepository
+	repo   repository.MetricRepository
+	logger logger.Logger
 }
 
-func NewUpdateMetric(repo repository.MetricRepository) *UpdateMetric {
-	return &UpdateMetric{repo: repo}
+func NewUpdateMetric(repo repository.MetricRepository, logger logger.Logger) *UpdateMetric {
+	return &UpdateMetric{repo: repo, logger: logger}
 }
 
 func (u *UpdateMetric) Execute(cmd UpdateMetricCommand) error {
+	u.logger.Info("Executing update metric usecase", logger.String("name", cmd.Name))
+
 	name, err := metric.NewName(cmd.Name)
 	if err != nil {
 		return err
@@ -40,6 +44,8 @@ func (u *UpdateMetric) Execute(cmd UpdateMetricCommand) error {
 }
 
 func (u *UpdateMetric) updateGauge(name metric.Name, rawValue string) error {
+	u.logger.Info("Updating gauge metric", logger.String("name", name.String()))
+
 	value, err := strconv.ParseFloat(rawValue, 64)
 
 	if err != nil {
@@ -66,6 +72,8 @@ func (u *UpdateMetric) updateGauge(name metric.Name, rawValue string) error {
 }
 
 func (u *UpdateMetric) updateCounter(name metric.Name, rawValue string) error {
+	u.logger.Info("Updating counter metric", logger.String("name", name.String()))
+
 	delta, err := strconv.ParseInt(rawValue, 10, 64)
 
 	if err != nil {

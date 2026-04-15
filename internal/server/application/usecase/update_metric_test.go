@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
+	sharedlog "github.com/a-aleesshin/metrics/internal/shared/port/logger"
 )
 
 type metricRepositoryStub struct {
@@ -19,6 +20,12 @@ type metricRepositoryStub struct {
 	savedGauge   *metric.Gauge
 	savedCounter *metric.Counter
 }
+
+type nopLogger struct{}
+
+func (nopLogger) Info(string, ...sharedlog.Field) {}
+
+func (nopLogger) Error(string, ...sharedlog.Field) {}
 
 func (m *metricRepositoryStub) GetGaugeByName(name metric.Name) (*metric.Gauge, error) {
 	if m.getGaugeErr != nil {
@@ -58,6 +65,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 		name              string
 		command           UpdateMetricCommand
 		repo              *metricRepositoryStub
+		logger            sharedlog.Logger
 		wantErr           error
 		wantGaugeName     string
 		wantGaugeValue    float64
@@ -74,6 +82,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 				Value: "123.45",
 			},
 			repo:            &metricRepositoryStub{},
+			logger:          nopLogger{},
 			wantGaugeName:   "Alloc",
 			wantGaugeValue:  123.45,
 			expectGaugeSave: true,
@@ -88,6 +97,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			repo: &metricRepositoryStub{
 				gaugeByName: existingGauge,
 			},
+			logger:          nopLogger{},
 			wantGaugeName:   "Alloc",
 			wantGaugeValue:  200.5,
 			expectGaugeSave: true,
@@ -100,6 +110,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 				Value: "7",
 			},
 			repo:              &metricRepositoryStub{},
+			logger:            nopLogger{},
 			wantCounterName:   "PollCount",
 			wantCounterDelta:  7,
 			expectCounterSave: true,
@@ -114,6 +125,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			repo: &metricRepositoryStub{
 				counterByName: existingCounter,
 			},
+			logger:            nopLogger{},
 			wantCounterName:   "PollCount",
 			wantCounterDelta:  8,
 			expectCounterSave: true,
@@ -126,6 +138,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 				Value: "1",
 			},
 			repo:    &metricRepositoryStub{},
+			logger:  nopLogger{},
 			wantErr: metric.ErrNameEmpty,
 		},
 		{
@@ -136,6 +149,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 				Value: "1",
 			},
 			repo:    &metricRepositoryStub{},
+			logger:  nopLogger{},
 			wantErr: metric.ErrUnsupportedMetricType,
 		},
 		{
@@ -146,6 +160,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 				Value: "abc",
 			},
 			repo:    &metricRepositoryStub{},
+			logger:  nopLogger{},
 			wantErr: metric.ErrInvalidMetricValue,
 		},
 		{
@@ -156,6 +171,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 				Value: "abc",
 			},
 			repo:    &metricRepositoryStub{},
+			logger:  nopLogger{},
 			wantErr: metric.ErrInvalidMetricValue,
 		},
 		{
@@ -168,6 +184,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			repo: &metricRepositoryStub{
 				getGaugeErr: errors.New("get gauge failed"),
 			},
+			logger:  nopLogger{},
 			wantErr: errors.New("get gauge failed"),
 		},
 		{
@@ -180,6 +197,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			repo: &metricRepositoryStub{
 				saveCounterErr: errors.New("save counter failed"),
 			},
+			logger:  nopLogger{},
 			wantErr: errors.New("save counter failed"),
 		},
 	}
@@ -187,7 +205,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			uc := NewUpdateMetric(tt.repo)
+			uc := NewUpdateMetric(tt.repo, tt.logger)
 
 			// Act
 			err := uc.Execute(tt.command)
