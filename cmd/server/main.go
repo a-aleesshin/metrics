@@ -9,7 +9,10 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/infra/persistence/memory"
 	"github.com/a-aleesshin/metrics/internal/server/transport/cli"
 	"github.com/a-aleesshin/metrics/internal/server/transport/http/metrics"
+	"github.com/a-aleesshin/metrics/internal/server/transport/http/middleware"
+	"github.com/a-aleesshin/metrics/internal/shared/logger"
 	sharedrouter "github.com/a-aleesshin/metrics/internal/shared/router"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -19,9 +22,16 @@ func main() {
 		log.Fatal("config error: ", err)
 	}
 
-	storage := memory.NewMemStorage()
+	baseZap, err := zap.NewProduction()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = baseZap.Sync() }()
 
-	updateMetrics := usecase.NewUpdateMetric(storage)
+	storage := memory.NewMemStorage()
+	appLogger := logger.NewZapLogger(baseZap)
+
+	updateMetrics := usecase.NewUpdateMetric(storage, appLogger)
 	getValueMetric := usecase.NewGetValueMetricUseCase(storage)
 	listMetrics := usecase.NewListMetricUseCase(storage)
 
@@ -31,7 +41,12 @@ func main() {
 		listMetrics,
 	)
 
-	router := sharedrouter.New(metricsHandler)
+	router := sharedrouter.New(
+		[]func(http.Handler) http.Handler{
+			middleware.RequestLogger(baseZap),
+		},
+		metricsHandler,
+	)
 
 	server := &http.Server{
 		Addr:    flags.Address,

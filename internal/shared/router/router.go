@@ -10,8 +10,12 @@ type RouterRigister interface {
 	RegisterRoutes(router chi.Router)
 }
 
-func New(registrars ...RouterRigister) http.Handler {
+func New(middlewares []func(http.Handler) http.Handler, registrars ...RouterRigister) http.Handler {
 	r := chi.NewRouter()
+
+	for _, mw := range middlewares {
+		r.Use(mw)
+	}
 
 	for _, rr := range registrars {
 		rr.RegisterRoutes(r)
