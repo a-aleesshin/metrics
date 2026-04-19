@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 type RouterRigister interface {
@@ -12,6 +13,8 @@ type RouterRigister interface {
 
 func New(middlewares []func(http.Handler) http.Handler, registrars ...RouterRigister) http.Handler {
 	r := chi.NewRouter()
+
+	r.Use(middleware.StripSlashes)
 
 	for _, mw := range middlewares {
 		r.Use(mw)
