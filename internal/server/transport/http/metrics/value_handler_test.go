@@ -13,22 +13,6 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-type valueMetricsUseCaseSpy struct {
-	command usecase.ValueMetricCommand
-	result  string
-	err     error
-	called  bool
-}
-
-func (s *valueMetricsUseCaseSpy) Execute(cmd usecase.ValueMetricCommand) (string, error) {
-	s.called = true
-	s.command = cmd
-	if s.err != nil {
-		return "", s.err
-	}
-	return s.result, nil
-}
-
 func TestHandler_Value(t *testing.T) {
 	tests := []struct {
 		name           string
