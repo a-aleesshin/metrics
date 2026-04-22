@@ -122,8 +122,12 @@ func CompressResponse(next http.Handler) http.Handler {
 		ok := strings.Contains(r.Header.Get("Accept-Encoding"), encGzip)
 		cw := newCompressWriter(w, ok)
 
-		defer func() { _ = cw.Close() }()
-
 		next.ServeHTTP(cw, r)
+
+		if !cw.decided {
+			cw.decide()
+		}
+
+		_ = cw.Close()
 	})
 }
