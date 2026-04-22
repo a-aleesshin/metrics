@@ -2,6 +2,7 @@ package httpadapter
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -59,13 +60,27 @@ func (m *MetricSender) Send(dto dto.MetricDTO) error {
 		return err
 	}
 
-	request, err := http.NewRequest(http.MethodPost, m.url+"/update", bytes.NewReader(body))
+	var gzBuf bytes.Buffer
+	gz := gzip.NewWriter(&gzBuf)
+
+	if _, err := gz.Write(body); err != nil {
+		_ = gz.Close()
+		return err
+	}
+
+	if err := gz.Close(); err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest(http.MethodPost, m.url+"/update", &gzBuf)
 
 	if err != nil {
 		return err
 	}
 
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Encoding", "gzip")
+	request.Header.Set("Accept-Encoding", "gzip")
 
 	response, err := m.client.Do(request)
 

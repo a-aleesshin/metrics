@@ -43,6 +43,8 @@ func main() {
 
 	router := sharedrouter.New(
 		[]func(http.Handler) http.Handler{
+			middleware.DecompressRequest,
+			middleware.CompressResponse,
 			middleware.RequestLogger(baseZap),
 		},
 		metricsHandler,

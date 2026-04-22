@@ -1,6 +1,7 @@
 package httpadapter
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -21,9 +22,20 @@ func TestMetricSender_Send_GaugeJSON(t *testing.T) {
 		gotPath = r.URL.Path
 		gotContentType = r.Header.Get("Content-Type")
 
-		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+		if r.Header.Get("Content-Encoding") != "gzip" {
+			t.Fatalf("expected gzip content encoding, got %q", r.Header.Get("Content-Encoding"))
 		}
+
+		gr, err := gzip.NewReader(r.Body)
+		if err != nil {
+			t.Fatalf("failed to create gzip reader: %v", err)
+		}
+		defer gr.Close()
+
+		if err := json.NewDecoder(gr).Decode(&gotBody); err != nil {
+			t.Fatalf("failed to decode gzip json body: %v", err)
+		}
+
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
@@ -66,9 +78,20 @@ func TestMetricSender_Send_CounterJSON(t *testing.T) {
 	var gotBody dto2.MetricsSend
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+		if r.Header.Get("Content-Encoding") != "gzip" {
+			t.Fatalf("expected gzip content encoding, got %q", r.Header.Get("Content-Encoding"))
 		}
+
+		gr, err := gzip.NewReader(r.Body)
+		if err != nil {
+			t.Fatalf("failed to create gzip reader: %v", err)
+		}
+		defer gr.Close()
+
+		if err := json.NewDecoder(gr).Decode(&gotBody); err != nil {
+			t.Fatalf("failed to decode gzip json body: %v", err)
+		}
+
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
@@ -195,5 +218,80 @@ func TestMetricSender_Send_NormalizesAddressWithoutScheme(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("expected server to be called")
+	}
+}
+
+func TestMetricSender_Send_UsesGzipRequestBody(t *testing.T) {
+	// Arrange
+	var gotContentEncoding string
+	var gotContentType string
+	var gotAcceptEncoding string
+	var gotPath string
+	var gotMethod string
+	var gotBody dto2.MetricsSend
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotContentEncoding = r.Header.Get("Content-Encoding")
+		gotContentType = r.Header.Get("Content-Type")
+		gotAcceptEncoding = r.Header.Get("Accept-Encoding")
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+
+		if r.Header.Get("Content-Encoding") != "gzip" {
+			t.Fatalf("expected gzip content encoding, got %q", r.Header.Get("Content-Encoding"))
+		}
+
+		gr, err := gzip.NewReader(r.Body)
+		if err != nil {
+			t.Fatalf("failed to create gzip reader: %v", err)
+		}
+		defer gr.Close()
+
+		if err := json.NewDecoder(gr).Decode(&gotBody); err != nil {
+			t.Fatalf("failed to decode gzip json body: %v", err)
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	sender := NewMetricSender(ts.URL, ts.Client())
+
+	// Act
+	err := sender.Send(dto.MetricDTO{
+		Type:  "gauge",
+		Name:  "Alloc",
+		Value: "123.45",
+	})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotMethod != http.MethodPost {
+		t.Fatalf("expected method POST, got %s", gotMethod)
+	}
+	if gotPath != "/update" {
+		t.Fatalf("expected path /update, got %s", gotPath)
+	}
+	if gotContentEncoding != "gzip" {
+		t.Fatalf("expected Content-Encoding gzip, got %q", gotContentEncoding)
+	}
+	if !strings.Contains(gotContentType, "application/json") {
+		t.Fatalf("expected Content-Type application/json, got %q", gotContentType)
+	}
+	if !strings.Contains(gotAcceptEncoding, "gzip") {
+		t.Fatalf("expected Accept-Encoding gzip, got %q", gotAcceptEncoding)
+	}
+
+	if gotBody.ID != "Alloc" || gotBody.MType != "gauge" {
+		t.Fatalf("unexpected body id/type: %+v", gotBody)
+	}
+	if gotBody.Value == nil || *gotBody.Value != 123.45 {
+		t.Fatalf("expected gauge value 123.45, got %+v", gotBody.Value)
+	}
+	if gotBody.Delta != nil {
+		t.Fatalf("expected delta nil, got %+v", gotBody.Delta)
 	}
 }
