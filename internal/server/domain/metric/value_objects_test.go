@@ -13,13 +13,13 @@ func TestNewID(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name:    "valid id",
+			name:    "valid_id",
 			input:   "metric-id",
 			want:    ID("metric-id"),
 			wantErr: nil,
 		},
 		{
-			name:    "empty id",
+			name:    "empty_id",
 			input:   "",
 			want:    "",
 			wantErr: ErrIDEmpty,
@@ -49,13 +49,13 @@ func TestNewName(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name:    "valid name",
+			name:    "valid_name",
 			input:   "Alloc",
 			want:    Name("Alloc"),
 			wantErr: nil,
 		},
 		{
-			name:    "empty name",
+			name:    "empty_name",
 			input:   "",
 			want:    "",
 			wantErr: ErrNameEmpty,

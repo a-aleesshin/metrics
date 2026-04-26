@@ -10,6 +10,10 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
 )
 
+type SnapshotSaver interface {
+	Execute() error
+}
+
 type UpdateMetricCommand struct {
 	Type  string
 	Name  string
@@ -17,12 +21,17 @@ type UpdateMetricCommand struct {
 }
 
 type UpdateMetric struct {
-	repo   repository.MetricRepository
-	logger logger.Logger
+	repo          repository.MetricRepository
+	logger        logger.Logger
+	snapshotSaver SnapshotSaver
 }
 
-func NewUpdateMetric(repo repository.MetricRepository, logger logger.Logger) *UpdateMetric {
-	return &UpdateMetric{repo: repo, logger: logger}
+func NewUpdateMetric(repo repository.MetricRepository, logger logger.Logger, snapshotSaver SnapshotSaver) *UpdateMetric {
+	return &UpdateMetric{
+		repo:          repo,
+		logger:        logger,
+		snapshotSaver: snapshotSaver,
+	}
 }
 
 func (u *UpdateMetric) Execute(cmd UpdateMetricCommand) error {
@@ -68,7 +77,11 @@ func (u *UpdateMetric) updateGauge(name metric.Name, rawValue string) error {
 		gauge.UpdateValue(value)
 	}
 
-	return u.repo.SaveGauge(gauge)
+	if err := u.repo.SaveGauge(gauge); err != nil {
+		return err
+	}
+
+	return u.persistSnapshotIfNeeded()
 }
 
 func (u *UpdateMetric) updateCounter(name metric.Name, rawValue string) error {
@@ -96,5 +109,27 @@ func (u *UpdateMetric) updateCounter(name metric.Name, rawValue string) error {
 		counter.Add(delta)
 	}
 
-	return u.repo.SaveCounter(counter)
+	if err := u.repo.SaveCounter(counter); err != nil {
+		return err
+	}
+
+	return u.persistSnapshotIfNeeded()
+}
+
+func (u *UpdateMetric) persistSnapshotIfNeeded() error {
+	if u.snapshotSaver == nil {
+		return nil
+	}
+
+	if err := u.snapshotSaver.Execute(); err != nil {
+		u.logger.Error(
+			"snapshot save failed",
+			logger.String("component", "update_metric"),
+			logger.String("error", err.Error()),
+		)
+
+		return nil
+	}
+
+	return nil
 }

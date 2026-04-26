@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
@@ -394,6 +395,118 @@ func TestMemStorage_ListCounters(t *testing.T) {
 				if !ok {
 					t.Fatalf("expected counter %q not found", name)
 				}
+				if gotDelta != wantDelta {
+					t.Fatalf("counter %q: expected %d, got %d", name, wantDelta, gotDelta)
+				}
+			}
+		})
+	}
+}
+
+func TestMemStorage_GetAllMetrics(t *testing.T) {
+	tests := []struct {
+		name         string
+		prepare      func(t *testing.T, s *MemStorage)
+		wantGaugeLen int
+		wantCtrLen   int
+		wantGauges   map[string]float64
+		wantCounters map[string]int64
+	}{
+		{
+			name: "empty_storage",
+			prepare: func(t *testing.T, s *MemStorage) {
+			},
+			wantGauges:   map[string]float64{},
+			wantCounters: map[string]int64{},
+		},
+		{
+			name: "returns_all_metrics",
+			prepare: func(t *testing.T, s *MemStorage) {
+				g1, _ := metric.NewGauge("g1", "Alloc", 10.5)
+				g2, _ := metric.NewGauge("g2", "HeapInuse", 42)
+				c1, _ := metric.NewCounter("c1", "PollCount", 3)
+				c2, _ := metric.NewCounter("c2", "Requests", 9)
+				_ = s.SaveGauge(g1)
+				_ = s.SaveGauge(g2)
+				_ = s.SaveCounter(c1)
+				_ = s.SaveCounter(c2)
+			},
+			wantGaugeLen: 2,
+			wantCtrLen:   2,
+			wantGauges: map[string]float64{
+				"Alloc":     10.5,
+				"HeapInuse": 42,
+			},
+			wantCounters: map[string]int64{
+				"PollCount": 3,
+				"Requests":  9,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			s := NewMemStorage()
+			tt.prepare(t, s)
+
+			// Act
+			got, err := s.GetAllMetrics()
+
+			// Assert
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(got.Gauges) != tt.wantGaugeLen {
+				t.Fatalf("expected %d gauges, got %d", tt.wantGaugeLen, len(got.Gauges))
+			}
+
+			if len(got.Counters) != tt.wantCtrLen {
+				t.Fatalf("expected %d counters, got %d", tt.wantCtrLen, len(got.Counters))
+			}
+
+			gotGauges := make(map[string]float64, len(got.Gauges))
+
+			for _, g := range got.Gauges {
+				if g == nil {
+					fmt.Println("nil gauge")
+				}
+
+				gotGauges[g.Name().String()] = g.Value()
+			}
+
+			gotCounters := make(map[string]int64, len(got.Counters))
+			for _, c := range got.Counters {
+				if c == nil {
+					t.Fatal("got nil counter")
+				}
+				gotCounters[c.Name().String()] = c.Delta()
+			}
+
+			if len(gotGauges) != len(tt.wantGauges) {
+				t.Fatalf("expected %d unique gauges, got %d", len(tt.wantGauges), len(gotGauges))
+			}
+
+			for name, wantValue := range tt.wantGauges {
+				gotValue, ok := gotGauges[name]
+
+				if !ok {
+					t.Fatalf("expected gauge %q not found", name)
+				}
+
+				if gotValue != wantValue {
+					t.Fatalf("gauge %q: expected %v, got %v", name, wantValue, gotValue)
+				}
+			}
+
+			for name, wantDelta := range tt.wantCounters {
+				gotDelta, ok := gotCounters[name]
+
+				if !ok {
+					t.Fatalf("expected counter %q not found", name)
+				}
+
 				if gotDelta != wantDelta {
 					t.Fatalf("counter %q: expected %d, got %d", name, wantDelta, gotDelta)
 				}

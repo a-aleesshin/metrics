@@ -57,6 +57,16 @@ func (m *metricRepositoryStub) SaveCounter(counter *metric.Counter) error {
 	return nil
 }
 
+type snapshotSaverStub struct {
+	calls int
+	err   error
+}
+
+func (s *snapshotSaverStub) Execute() error {
+	s.calls++
+	return s.err
+}
+
 func TestUpdateMetric_Execute(t *testing.T) {
 	existingGauge, _ := metric.NewGauge("gauge-id", "Alloc", 10.5)
 	existingCounter, _ := metric.NewCounter("counter-id", "PollCount", 3)
@@ -75,7 +85,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 		expectCounterSave bool
 	}{
 		{
-			name: "create new gauge",
+			name: "create_new_gauge",
 			command: UpdateMetricCommand{
 				Type:  "gauge",
 				Name:  "Alloc",
@@ -88,7 +98,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			expectGaugeSave: true,
 		},
 		{
-			name: "update existing gauge",
+			name: "update_existing_gauge",
 			command: UpdateMetricCommand{
 				Type:  "gauge",
 				Name:  "Alloc",
@@ -103,7 +113,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			expectGaugeSave: true,
 		},
 		{
-			name: "create new counter",
+			name: "create_new_counter",
 			command: UpdateMetricCommand{
 				Type:  "counter",
 				Name:  "PollCount",
@@ -116,7 +126,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			expectCounterSave: true,
 		},
 		{
-			name: "update existing counter",
+			name: "update_existing_counter",
 			command: UpdateMetricCommand{
 				Type:  "counter",
 				Name:  "PollCount",
@@ -131,7 +141,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			expectCounterSave: true,
 		},
 		{
-			name: "empty metric name",
+			name: "empty_metric_name",
 			command: UpdateMetricCommand{
 				Type:  "gauge",
 				Name:  "",
@@ -142,7 +152,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			wantErr: metric.ErrNameEmpty,
 		},
 		{
-			name: "unsupported metric type",
+			name: "unsupported_metric_type",
 			command: UpdateMetricCommand{
 				Type:  "histogram",
 				Name:  "Alloc",
@@ -153,7 +163,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			wantErr: metric.ErrUnsupportedMetricType,
 		},
 		{
-			name: "invalid gauge value",
+			name: "invalid_gauge_value",
 			command: UpdateMetricCommand{
 				Type:  "gauge",
 				Name:  "Alloc",
@@ -164,7 +174,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			wantErr: metric.ErrInvalidMetricValue,
 		},
 		{
-			name: "invalid counter value",
+			name: "invalid_counter_value",
 			command: UpdateMetricCommand{
 				Type:  "counter",
 				Name:  "PollCount",
@@ -175,7 +185,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			wantErr: metric.ErrInvalidMetricValue,
 		},
 		{
-			name: "get gauge error",
+			name: "get_gauge_error",
 			command: UpdateMetricCommand{
 				Type:  "gauge",
 				Name:  "Alloc",
@@ -188,7 +198,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			wantErr: errors.New("get gauge failed"),
 		},
 		{
-			name: "save counter error",
+			name: "save_counter_error",
 			command: UpdateMetricCommand{
 				Type:  "counter",
 				Name:  "PollCount",
@@ -205,7 +215,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			uc := NewUpdateMetric(tt.repo, tt.logger)
+			uc := NewUpdateMetric(tt.repo, tt.logger, nil)
 
 			// Act
 			err := uc.Execute(tt.command)
@@ -249,5 +259,63 @@ func TestUpdateMetric_Execute(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestUpdateMetric_Execute_WithSnapshotSaver(t *testing.T) {
+	repo := &metricRepositoryStub{}
+	saver := &snapshotSaverStub{}
+	uc := NewUpdateMetric(repo, nopLogger{}, saver)
+
+	err := uc.Execute(UpdateMetricCommand{
+		Type: "gauge", Name: "Alloc", Value: "1.23",
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if saver.calls != 1 {
+		t.Fatalf("expected saver calls=1, got %d", saver.calls)
+	}
+}
+
+func TestUpdateMetric_Execute_SnapshotSaverNotCalledOnRepoSaveError(t *testing.T) {
+	repo := &metricRepositoryStub{
+		saveGaugeErr: errors.New("save gauge failed"),
+	}
+	saver := &snapshotSaverStub{}
+	uc := NewUpdateMetric(repo, nopLogger{}, saver)
+
+	err := uc.Execute(UpdateMetricCommand{
+		Type: "gauge", Name: "Alloc", Value: "1.23",
+	})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if saver.calls != 0 {
+		t.Fatalf("expected saver calls=0, got %d", saver.calls)
+	}
+}
+
+func TestUpdateMetric_Execute_SnapshotSaverErrorIsNonFatal(t *testing.T) {
+	repo := &metricRepositoryStub{}
+	saver := &snapshotSaverStub{
+		err: errors.New("snapshot saver failed"),
+	}
+	uc := NewUpdateMetric(repo, nopLogger{}, saver)
+
+	err := uc.Execute(UpdateMetricCommand{
+		Type: "gauge", Name: "Alloc", Value: "1.23",
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if saver.calls != 1 {
+		t.Fatalf("expected saver calls=1, got %d", saver.calls)
 	}
 }
