@@ -1,6 +1,8 @@
 package usecase
 
 import (
+	"math"
+
 	"github.com/a-aleesshin/metrics/internal/agent/application/port/generator"
 	"github.com/a-aleesshin/metrics/internal/agent/application/port/reader"
 	"github.com/a-aleesshin/metrics/internal/agent/application/port/repository"
@@ -31,7 +33,13 @@ func (usecase *CollectMetricsUseCase) Execute() error {
 			return err
 		}
 
-		err = usecase.repository.SetGauge(metric.NewGauge(name, metricReader.Value))
+		value := metricReader.Value
+
+		if math.IsNaN(value) || math.IsInf(value, 0) {
+			value = 0
+		}
+
+		err = usecase.repository.SetGauge(metric.NewGauge(name, value))
 
 		if err != nil {
 			return err
@@ -44,7 +52,12 @@ func (usecase *CollectMetricsUseCase) Execute() error {
 		return err
 	}
 
-	err = usecase.repository.SetGauge(metric.NewGauge(randomValueName, usecase.randomValue.GenerateFloat64()))
+	rv := usecase.randomValue.GenerateFloat64()
+	if math.IsNaN(rv) || math.IsInf(rv, 0) {
+		rv = 0
+	}
+
+	err = usecase.repository.SetGauge(metric.NewGauge(randomValueName, rv))
 
 	if err != nil {
 		return err

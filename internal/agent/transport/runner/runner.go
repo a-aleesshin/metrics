@@ -3,6 +3,8 @@ package runner
 import (
 	"context"
 	"time"
+
+	portlogger "github.com/a-aleesshin/metrics/internal/shared/port/logger"
 )
 
 type CollectMetricsExecutor interface {
@@ -18,6 +20,7 @@ type AgentRunner struct {
 	reportUseCase  ReportMetricsExecutor
 	pollInterval   time.Duration
 	reportInterval time.Duration
+	logger         portlogger.Logger
 }
 
 func NewAgentRunner(
@@ -25,12 +28,14 @@ func NewAgentRunner(
 	reportUseCase ReportMetricsExecutor,
 	pollInterval time.Duration,
 	reportInterval time.Duration,
+	logger portlogger.Logger,
 ) *AgentRunner {
 	return &AgentRunner{
 		collectUseCase: collectUseCase,
 		reportUseCase:  reportUseCase,
 		pollInterval:   pollInterval,
 		reportInterval: reportInterval,
+		logger:         logger,
 	}
 }
 
@@ -49,13 +54,15 @@ func (r *AgentRunner) Run(ctx context.Context) error {
 			err := r.reportUseCase.Execute()
 
 			if err != nil {
-				return err
+				r.logger.Error("report metrics failed", portlogger.Err(err))
+				continue
 			}
 		case <-tickerSecond.C:
 			err := r.collectUseCase.Execute()
 
 			if err != nil {
-				return err
+				r.logger.Error("collect metrics failed", portlogger.Err(err))
+				continue
 			}
 		}
 	}
