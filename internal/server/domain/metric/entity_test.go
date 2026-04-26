@@ -17,7 +17,7 @@ func TestNewGauge(t *testing.T) {
 		wantValue  float64
 	}{
 		{
-			name:       "valid gauge",
+			name:       "valid_gauge",
 			id:         "gauge-id",
 			metricName: "Alloc",
 			value:      123.45,
@@ -27,14 +27,14 @@ func TestNewGauge(t *testing.T) {
 			wantValue:  123.45,
 		},
 		{
-			name:       "empty id",
+			name:       "empty_id",
 			id:         "",
 			metricName: "Alloc",
 			value:      123.45,
 			wantErr:    ErrIDEmpty,
 		},
 		{
-			name:       "empty name",
+			name:       "empty_name",
 			id:         "gauge-id",
 			metricName: "",
 			value:      123.45,

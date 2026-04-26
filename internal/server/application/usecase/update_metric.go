@@ -3,11 +3,16 @@ package usecase
 import (
 	"strconv"
 
+	"github.com/a-aleesshin/metrics/internal/shared/port/logger"
 	"github.com/google/uuid"
 
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
 )
+
+type SnapshotSaver interface {
+	Execute() error
+}
 
 type UpdateMetricCommand struct {
 	Type  string
@@ -16,14 +21,22 @@ type UpdateMetricCommand struct {
 }
 
 type UpdateMetric struct {
-	repo repository.MetricRepository
+	repo          repository.MetricRepository
+	logger        logger.Logger
+	snapshotSaver SnapshotSaver
 }
 
-func NewUpdateMetric(repo repository.MetricRepository) *UpdateMetric {
-	return &UpdateMetric{repo: repo}
+func NewUpdateMetric(repo repository.MetricRepository, logger logger.Logger, snapshotSaver SnapshotSaver) *UpdateMetric {
+	return &UpdateMetric{
+		repo:          repo,
+		logger:        logger,
+		snapshotSaver: snapshotSaver,
+	}
 }
 
 func (u *UpdateMetric) Execute(cmd UpdateMetricCommand) error {
+	u.logger.Info("Executing update metric usecase", logger.String("name", cmd.Name))
+
 	name, err := metric.NewName(cmd.Name)
 	if err != nil {
 		return err
@@ -40,6 +53,8 @@ func (u *UpdateMetric) Execute(cmd UpdateMetricCommand) error {
 }
 
 func (u *UpdateMetric) updateGauge(name metric.Name, rawValue string) error {
+	u.logger.Info("Updating gauge metric", logger.String("name", name.String()))
+
 	value, err := strconv.ParseFloat(rawValue, 64)
 
 	if err != nil {
@@ -62,10 +77,16 @@ func (u *UpdateMetric) updateGauge(name metric.Name, rawValue string) error {
 		gauge.UpdateValue(value)
 	}
 
-	return u.repo.SaveGauge(gauge)
+	if err := u.repo.SaveGauge(gauge); err != nil {
+		return err
+	}
+
+	return u.persistSnapshotIfNeeded()
 }
 
 func (u *UpdateMetric) updateCounter(name metric.Name, rawValue string) error {
+	u.logger.Info("Updating counter metric", logger.String("name", name.String()))
+
 	delta, err := strconv.ParseInt(rawValue, 10, 64)
 
 	if err != nil {
@@ -88,5 +109,27 @@ func (u *UpdateMetric) updateCounter(name metric.Name, rawValue string) error {
 		counter.Add(delta)
 	}
 
-	return u.repo.SaveCounter(counter)
+	if err := u.repo.SaveCounter(counter); err != nil {
+		return err
+	}
+
+	return u.persistSnapshotIfNeeded()
+}
+
+func (u *UpdateMetric) persistSnapshotIfNeeded() error {
+	if u.snapshotSaver == nil {
+		return nil
+	}
+
+	if err := u.snapshotSaver.Execute(); err != nil {
+		u.logger.Error(
+			"snapshot save failed",
+			logger.String("component", "update_metric"),
+			logger.String("error", err.Error()),
+		)
+
+		return nil
+	}
+
+	return nil
 }

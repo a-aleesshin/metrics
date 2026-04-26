@@ -149,3 +149,35 @@ func (m *MemStorage) FindCounterByName(name metric.Name) (delta int64, found boo
 
 	return rec.Delta, true, nil
 }
+
+func (m *MemStorage) GetAllMetrics() (repository.MetricsState, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	state := repository.MetricsState{
+		Gauges:   make([]*metric.Gauge, 0, len(m.gauges)),
+		Counters: make([]*metric.Counter, 0, len(m.counter)),
+	}
+
+	for _, rec := range m.gauges {
+		g, err := metric.RestoreGauge(rec.ID, rec.Name, rec.Value)
+
+		if err != nil {
+			return repository.MetricsState{}, err
+		}
+
+		state.Gauges = append(state.Gauges, g)
+	}
+
+	for _, rec := range m.counter {
+		c, err := metric.RestoreCounter(rec.ID, rec.Name, rec.Delta)
+
+		if err != nil {
+			return repository.MetricsState{}, err
+		}
+
+		state.Counters = append(state.Counters, c)
+	}
+
+	return state, nil
+}
