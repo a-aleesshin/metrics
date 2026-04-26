@@ -7,13 +7,13 @@ type Gauge struct {
 }
 
 func NewGauge(id string, name string, value float64) (*Gauge, error) {
-	metricName, err := NewName(name)
+	metricID, err := NewID(id)
+
 	if err != nil {
 		return nil, err
 	}
 
-	metricID, err := NewID(id)
-
+	metricName, err := NewName(name)
 	if err != nil {
 		return nil, err
 	}

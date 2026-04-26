@@ -49,7 +49,7 @@ func TestGetValueMetricUseCase_Execute(t *testing.T) {
 		wantErr   error
 	}{
 		{
-			name: "user case get value gauge found",
+			name: "user_case_get_value_gauge_found",
 			cmd:  ValueMetricCommand{Type: "gauge", Name: "Alloc"},
 			repo: &metricQueryRepoStub{
 				gaugeValue: 123.45,
@@ -58,7 +58,7 @@ func TestGetValueMetricUseCase_Execute(t *testing.T) {
 			wantValue: "123.45",
 		},
 		{
-			name: "user case get value counter found",
+			name: "user_case_get_value_counter_found",
 			cmd:  ValueMetricCommand{Type: "counter", Name: "PollCount"},
 			repo: &metricQueryRepoStub{
 				counterValue: 7,
@@ -67,7 +67,7 @@ func TestGetValueMetricUseCase_Execute(t *testing.T) {
 			wantValue: "7",
 		},
 		{
-			name: "user case get value gauge not found",
+			name: "user_case_get_value_gauge_not_found",
 			cmd:  ValueMetricCommand{Type: "gauge", Name: "Missing"},
 			repo: &metricQueryRepoStub{
 				gaugeFound: false,
@@ -75,7 +75,7 @@ func TestGetValueMetricUseCase_Execute(t *testing.T) {
 			wantErr: applicationerror.ErrMetricNotFound,
 		},
 		{
-			name: "user case get value counter not found",
+			name: "user_case_get_value_counter_not_found",
 			cmd:  ValueMetricCommand{Type: "counter", Name: "Missing"},
 			repo: &metricQueryRepoStub{
 				counterFound: false,
@@ -83,13 +83,13 @@ func TestGetValueMetricUseCase_Execute(t *testing.T) {
 			wantErr: applicationerror.ErrMetricNotFound,
 		},
 		{
-			name:    "user case get value unsupported type",
+			name:    "user_case_get_value_unsupported_type",
 			cmd:     ValueMetricCommand{Type: "hist", Name: "Any"},
 			repo:    &metricQueryRepoStub{},
 			wantErr: metric.ErrUnsupportedMetricType,
 		},
 		{
-			name: "user case get value repo gauge error",
+			name: "user_case_get_value_repo_gauge_error",
 			cmd:  ValueMetricCommand{Type: "gauge", Name: "Alloc"},
 			repo: &metricQueryRepoStub{
 				gaugeErr: errors.New("repo fail"),

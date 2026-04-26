@@ -15,6 +15,8 @@ import (
 	"github.com/a-aleesshin/metrics/internal/agent/infra/runtime"
 	"github.com/a-aleesshin/metrics/internal/agent/transport/cli"
 	"github.com/a-aleesshin/metrics/internal/agent/transport/runner"
+	"github.com/a-aleesshin/metrics/internal/shared/logger"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -34,11 +36,15 @@ func main() {
 	collectUsecase := usecase.NewCollectMetricsUseCase(rider, repository, randomValue)
 	reportUsecase := usecase.NewReportMetricsUseCase(repository, sender)
 
+	baseZap, _ := zap.NewProduction()
+	appLogger := logger.NewZapLogger(baseZap)
+
 	agentRunner := runner.NewAgentRunner(
 		collectUsecase,
 		reportUsecase,
 		flags.PollInterval,
 		flags.ReportInterval,
+		appLogger,
 	)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)

@@ -49,7 +49,7 @@ func TestListMetrics_Execute(t *testing.T) {
 		wantSecond string
 	}{
 		{
-			name: "use case test 1",
+			name: "use_case_test_1",
 			repo: &metricQueryRepositoryStub{
 				gauges: []repository.GaugeSnapshot{
 					{
@@ -70,14 +70,14 @@ func TestListMetrics_Execute(t *testing.T) {
 			wantSecond: "gauge:HeapAlloc=123.45",
 		},
 		{
-			name: "use case list gauges error",
+			name: "use_case_list_gauges_error",
 			repo: &metricQueryRepositoryStub{
 				listCountersErr: errors.New("gauges failed"),
 			},
 			wantErr: true,
 		},
 		{
-			name: "use case list counters error",
+			name: "use_case_list_counters_error",
 			repo: &metricQueryRepositoryStub{
 				listGaugesErr: errors.New("counters failed"),
 			},
