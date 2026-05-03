@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,25 +10,10 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-type updateMetricUseCaseSpy struct {
-	command usecase.UpdateMetricCommand
-	err     error
-	called  bool
-}
-
 func (u *updateMetricUseCaseSpy) Execute(command usecase.UpdateMetricCommand) error {
 	u.called = true
 	u.command = command
 	return u.err
-}
-
-func withChiParams(r *http.Request, params map[string]string) *http.Request {
-	rc := chi.NewRouteContext()
-	for k, v := range params {
-		rc.URLParams.Add(k, v)
-	}
-	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, rc)
-	return r.WithContext(ctx)
 }
 
 func TestHandler_Update_ErrorMapping(t *testing.T) {
