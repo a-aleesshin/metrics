@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  ENV: '{{.ENV | default "local"}}'
+  COMPOSE_FILE: 'docker-compose.{{.ENV}}.yaml'
+  COMPOSE_PROJECT_NAME: 'metrics_{{.ENV}}'
+
+tasks:
+  db-up:
+    desc: Start database
+    cmds:
+      - docker compose -p {{.COMPOSE_PROJECT_NAME}} -f {{.COMPOSE_FILE}} up -d db
+    silent: true
+
+  db-down:
+    desc: Stop the local database container
+    cmds:
+      - docker compose -p {{.COMPOSE_PROJECT_NAME}} -f {{.COMPOSE_FILE}} down db --remove-orphans
+    silent: true

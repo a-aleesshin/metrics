@@ -114,7 +114,7 @@ func TestHandler_ValueJSON(t *testing.T) {
 				err:    tt.useCaseErr,
 			}
 
-			h := NewHandler(updateUseCaseNoop{}, valueSpy, listUseCaseNoop{})
+			h := NewHandler(updateUseCaseNoop{}, valueSpy, listUseCaseNoop{}, healthService{})
 
 			r := chi.NewRouter()
 			r.Post("/value", h.ValueJSON)

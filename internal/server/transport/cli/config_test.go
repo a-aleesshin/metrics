@@ -11,18 +11,20 @@ func resetEnv(t *testing.T) {
 	t.Setenv("STORE_INTERVAL", "")
 	t.Setenv("FILE_STORAGE_PATH", "")
 	t.Setenv("RESTORE", "")
+	t.Setenv("DATABASE_DSN", "")
 }
 
 func TestLoadConfig(t *testing.T) {
 	tests := []struct {
-		name         string
-		args         []string
-		env          map[string]string
-		wantAddress  string
-		wantInterval time.Duration
-		wantFilePath string
-		wantRestore  bool
-		wantErr      bool
+		name            string
+		args            []string
+		env             map[string]string
+		wantAddress     string
+		wantInterval    time.Duration
+		wantFilePath    string
+		wantRestore     bool
+		wantErr         bool
+		wantDatabaseDsn string
 	}{
 		{
 			name:         "defaults",
@@ -43,18 +45,20 @@ func TestLoadConfig(t *testing.T) {
 			wantRestore:  false,
 		},
 		{
-			name: "env overrides flags",
-			args: []string{"-a=127.0.0.1:9090", "-i=10", "-f=/tmp/from-flag.json", "-r=false"},
+			name: "env_overrides_flags",
+			args: []string{"-a=127.0.0.1:9090", "-i=10", "-f=/tmp/from-flag.json", "-r=false", "-d=postgres://postgres:postgres@localhost:54321/postgres?sslmode=disable"},
 			env: map[string]string{
 				"ADDRESS":           "env-host:7777",
 				"STORE_INTERVAL":    "42",
 				"FILE_STORAGE_PATH": "/tmp/from-env.json",
 				"RESTORE":           "true",
+				"DATABASE_DSN":      "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
 			},
-			wantAddress:  "env-host:7777",
-			wantInterval: 42 * time.Second,
-			wantFilePath: "/tmp/from-env.json",
-			wantRestore:  true,
+			wantAddress:     "env-host:7777",
+			wantInterval:    42 * time.Second,
+			wantFilePath:    "/tmp/from-env.json",
+			wantRestore:     true,
+			wantDatabaseDsn: "host=localhost port=5432 user=postgres password=postgres dbname=postgres sslmode=disable",
 		},
 		{
 			name:    "unknown flag",
@@ -83,6 +87,12 @@ func TestLoadConfig(t *testing.T) {
 		{
 			name:    "negative store interval in flag",
 			args:    []string{"-i=-1"},
+			env:     map[string]string{},
+			wantErr: true,
+		},
+		{
+			name:    "invalid_database_dsn",
+			args:    []string{"-d=some-invalid-dsn"},
 			env:     map[string]string{},
 			wantErr: true,
 		},
@@ -122,6 +132,9 @@ func TestLoadConfig(t *testing.T) {
 			}
 			if cfg.Restore != tt.wantRestore {
 				t.Fatalf("expected restore %v, got %v", tt.wantRestore, cfg.Restore)
+			}
+			if tt.wantDatabaseDsn != "" && cfg.Postgres.ConnectionString() != tt.wantDatabaseDsn {
+				t.Fatalf("expected restore %v, got %v", tt.wantDatabaseDsn, cfg.Postgres.ConnectionString())
 			}
 		})
 	}

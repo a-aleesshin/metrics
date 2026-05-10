@@ -11,6 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/a-aleesshin/metrics/internal/platform/db/postgres"
+	"github.com/a-aleesshin/metrics/internal/platform/health"
+	sharedrouter "github.com/a-aleesshin/metrics/internal/platform/http"
+	"github.com/a-aleesshin/metrics/internal/platform/logger"
 	"github.com/a-aleesshin/metrics/internal/server/application/mapper"
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
 	snapshotfile "github.com/a-aleesshin/metrics/internal/server/infra/persistence/file"
@@ -18,12 +22,11 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/transport/cli"
 	"github.com/a-aleesshin/metrics/internal/server/transport/http/metrics"
 	"github.com/a-aleesshin/metrics/internal/server/transport/http/middleware"
-	"github.com/a-aleesshin/metrics/internal/shared/logger"
-	sharedrouter "github.com/a-aleesshin/metrics/internal/shared/router"
 	"go.uber.org/zap"
 )
 
 func run(cfg *cli.ServerConfig) error {
+	ctx := context.Background()
 	baseZap, err := zap.NewProduction()
 
 	if err != nil {
@@ -57,11 +60,20 @@ func run(cfg *cli.ServerConfig) error {
 		saver = saveSnapshotUC
 	}
 
+	postgresPool, err := postgres.NewPool(ctx, cfg.Postgres)
+
+	if err != nil {
+		return fmt.Errorf("create postgres pool: %w", err)
+	}
+
+	postgresChecker := postgres.NewHealthChecker(postgresPool)
+	healthService := health.NewService(postgresChecker)
+
 	updateMetricsUC := usecase.NewUpdateMetric(storage, appLogger, saver)
 	getValueMetricUC := usecase.NewGetValueMetricUseCase(storage)
 	listMetricsUC := usecase.NewListMetricUseCase(storage)
 
-	metricsHandler := metrics.NewHandler(updateMetricsUC, getValueMetricUC, listMetricsUC)
+	metricsHandler := metrics.NewHandler(updateMetricsUC, getValueMetricUC, listMetricsUC, healthService)
 
 	router := sharedrouter.New(
 		[]func(http.Handler) http.Handler{

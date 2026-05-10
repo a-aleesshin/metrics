@@ -26,3 +26,7 @@ vendor/
 
 .env*
 !.env.example
+
+# Docker
+.docker-data
+.docker-logs

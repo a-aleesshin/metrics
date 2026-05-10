@@ -43,7 +43,7 @@ func TestHandler_writeError(t *testing.T) {
 
 func TestHandler_RegisterRoutes_Smoke(t *testing.T) {
 	// Arrange
-	h := NewHandler(updateUseCaseNoop{}, valueUseCaseNoop{}, listUseCaseNoop{})
+	h := NewHandler(updateUseCaseNoop{}, valueUseCaseNoop{}, listUseCaseNoop{}, healthService{})
 	r := chi.NewRouter()
 
 	// Act

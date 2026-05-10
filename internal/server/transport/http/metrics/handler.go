@@ -15,17 +15,20 @@ type Handler struct {
 	updateMetric   UpdateMetricsUseCase
 	getValueMetric ValueMetricUseCase
 	listMetric     ListMetricsUseCase
+	healthService  HealthService
 }
 
 func NewHandler(
 	updateMetric UpdateMetricsUseCase,
 	getValueMetric ValueMetricUseCase,
 	listMetric ListMetricsUseCase,
+	healthService HealthService,
 ) *Handler {
 	return &Handler{
 		updateMetric:   updateMetric,
 		getValueMetric: getValueMetric,
 		listMetric:     listMetric,
+		healthService:  healthService,
 	}
 }
 
@@ -35,6 +38,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Post("/value", h.ValueJSON)
 	r.Get("/value/{type}/{name}", h.Value)
 	r.Get("/", h.List)
+	r.Get("/ping", h.Ping)
 }
 
 func (h *Handler) writeError(w http.ResponseWriter, err error) {

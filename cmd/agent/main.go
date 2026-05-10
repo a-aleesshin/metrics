@@ -15,7 +15,7 @@ import (
 	"github.com/a-aleesshin/metrics/internal/agent/infra/runtime"
 	"github.com/a-aleesshin/metrics/internal/agent/transport/cli"
 	"github.com/a-aleesshin/metrics/internal/agent/transport/runner"
-	"github.com/a-aleesshin/metrics/internal/shared/logger"
+	"github.com/a-aleesshin/metrics/internal/platform/logger"
 	"go.uber.org/zap"
 )
 
