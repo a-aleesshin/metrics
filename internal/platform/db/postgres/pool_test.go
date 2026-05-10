@@ -4,7 +4,6 @@ package postgres
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -29,25 +28,34 @@ func TestPool_Integration_OK(t *testing.T) {
 	require.NoError(t, pool.Ping(ctx))
 }
 
+func TestNewConfigFromString_InvalidSSLMode(t *testing.T) {
+	cfg, err := NewConfigFromString(
+		"postgres://unknown:unknown@unknown:5432/unknown?sslmode=wrong",
+	)
+
+	require.Error(t, err)
+	require.Nil(t, cfg)
+	require.Contains(t, err.Error(), "parse dsn: cannot parse `postgres://unknown:xxxxx@unknown:5432/unknown?sslmode=wrong`: failed to configure TLS (sslmode is invalid)")
+}
+
 func TestPool_Integration_Fail(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	cfg, err := NewConfigFromString(
-		"postgres://unknown:unknown@unknown:5432/unknown?sslmode=disable",
+		"postgres://unknown:unknown@localhost:5432/unknown?sslmode=disable",
 	)
 
 	if err != nil {
 		t.Fatalf("invalid config: %v", err)
 	}
 
-	_, err = NewPool(ctx, cfg)
+	pool, err := NewPool(ctx, cfg)
 
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, pool)
+	t.Cleanup(pool.Close)
 
-	if !strings.Contains(err.Error(), "failed to connect to `user=unknown database=unknown`: hostname resolving error: lookup unknown: no such host") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	err = pool.Ping(ctx)
+	require.Error(t, err)
 }

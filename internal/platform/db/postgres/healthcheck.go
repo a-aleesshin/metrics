@@ -20,15 +20,8 @@ func (checker *HealthChecker) Name() string {
 }
 
 func (checker *HealthChecker) Check(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	err := checker.pool.Ping(ctx)
-
-	if err != nil {
-		checker.pool.Close()
-		return err
-	}
-
-	return nil
+	return checker.pool.Ping(ctx)
 }

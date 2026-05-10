@@ -12,14 +12,9 @@ func NewPool(ctx context.Context, cfg *Config) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("config cannot be nil")
 	}
 
-	dbPool, err := pgxpool.New(context.Background(), cfg.ConnectionString())
+	dbPool, err := pgxpool.New(ctx, cfg.ConnectionString())
 
 	if err != nil {
-		return nil, err
-	}
-
-	if err := dbPool.Ping(ctx); err != nil {
-		dbPool.Close()
 		return nil, err
 	}
 

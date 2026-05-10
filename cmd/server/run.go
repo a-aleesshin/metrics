@@ -66,6 +66,8 @@ func run(cfg *cli.ServerConfig) error {
 		return fmt.Errorf("create postgres pool: %w", err)
 	}
 
+	defer postgresPool.Close()
+
 	postgresChecker := postgres.NewHealthChecker(postgresPool)
 	healthService := health.NewService(postgresChecker)
 
