@@ -1,6 +1,9 @@
 package metrics
 
 import (
+	"context"
+
+	"github.com/a-aleesshin/metrics/internal/platform/health"
 	"github.com/a-aleesshin/metrics/internal/server/application/dto"
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
 )
@@ -16,3 +19,9 @@ func (listUseCaseNoop) Execute() (dto.ListMetricsResult, error) { return dto.Lis
 type valueUseCaseNoop struct{}
 
 func (valueUseCaseNoop) Execute(cmd usecase.ValueMetricCommand) (string, error) { return "", nil }
+
+type healthService struct{}
+
+func (h healthService) Check(ctx context.Context) health.Report {
+	return health.Report{Status: ""}
+}

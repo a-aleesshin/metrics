@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/a-aleesshin/metrics/internal/platform/db/postgres"
 )
 
 type ServerConfig struct {
@@ -13,6 +15,7 @@ type ServerConfig struct {
 	StoreInterval   time.Duration
 	FileStoragePath string
 	Restore         bool
+	Postgres        *postgres.Config
 }
 
 var (
@@ -20,6 +23,7 @@ var (
 	storeIntervalDefault   = 300
 	fileStoragePathDefault = "./metrics-db.json"
 	restoreDefault         = true
+	databaseDsnDefault     = "postgres://user:password@host:5432/dbname?sslmode=disable"
 )
 
 func LoadConfig(args []string) (*ServerConfig, error) {
@@ -30,11 +34,13 @@ func LoadConfig(args []string) (*ServerConfig, error) {
 	var address string
 	var storeInterval int
 	var filePath string
+	var dataBaseDsn string
 	var restore bool
 
 	fs.StringVar(&address, "a", addressDefault, "HTTP server address")
 	fs.IntVar(&storeInterval, "i", storeIntervalDefault, "store interval in seconds")
 	fs.StringVar(&filePath, "f", fileStoragePathDefault, "file storage path")
+	fs.StringVar(&dataBaseDsn, "d", databaseDsnDefault, "database DSN")
 	fs.BoolVar(&restore, "r", restoreDefault, "restore metrics from file on startup")
 
 	if err := fs.Parse(args); err != nil {
@@ -64,6 +70,19 @@ func LoadConfig(args []string) (*ServerConfig, error) {
 		return nil, err
 	}
 	cfg.Restore = valueRestore
+
+	valueDatabaseDsn, err := getStringValue(&dataBaseDsn, "DATABASE_DSN")
+	if err != nil {
+		return nil, err
+	}
+
+	postgresConfig, err := postgres.NewConfigFromString(valueDatabaseDsn)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create postgres config from DSN: %w", err)
+	}
+
+	cfg.Postgres = postgresConfig
 
 	return &cfg, nil
 }

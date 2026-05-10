@@ -63,7 +63,7 @@ func TestHandler_Update_ErrorMapping(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
 			useCaseSpy := &updateMetricUseCaseSpy{err: tt.useCaseErr}
-			handler := NewHandler(useCaseSpy, valueUseCaseNoop{}, listUseCaseNoop{})
+			handler := NewHandler(useCaseSpy, valueUseCaseNoop{}, listUseCaseNoop{}, healthService{})
 
 			r := chi.NewRouter()
 			r.Post("/update/{type}/{name}/{value}", handler.Update)

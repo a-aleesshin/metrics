@@ -76,7 +76,7 @@ func TestHandler_Value(t *testing.T) {
 				result: tt.useCaseResult,
 				err:    tt.useCaseErr,
 			}
-			h := NewHandler(updateUseCaseNoop{}, valueSpy, listUseCaseNoop{})
+			h := NewHandler(updateUseCaseNoop{}, valueSpy, listUseCaseNoop{}, healthService{})
 
 			r := chi.NewRouter()
 			r.Get("/value/{type}/{name}", h.Value)
