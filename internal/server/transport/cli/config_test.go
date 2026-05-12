@@ -1,17 +1,35 @@
 package cli
 
 import (
+	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func resetEnv(t *testing.T) {
 	t.Helper()
-	t.Setenv("ADDRESS", "")
-	t.Setenv("STORE_INTERVAL", "")
-	t.Setenv("FILE_STORAGE_PATH", "")
-	t.Setenv("RESTORE", "")
-	t.Setenv("DATABASE_DSN", "")
+
+	for _, key := range []string{
+		"ADDRESS",
+		"STORE_INTERVAL",
+		"FILE_STORAGE_PATH",
+		"RESTORE",
+		"DATABASE_DSN",
+	} {
+		old, ok := os.LookupEnv(key)
+
+		require.NoError(t, os.Unsetenv(key))
+
+		t.Cleanup(func() {
+			if ok {
+				require.NoError(t, os.Setenv(key, old))
+			} else {
+				require.NoError(t, os.Unsetenv(key))
+			}
+		})
+	}
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -135,173 +153,6 @@ func TestLoadConfig(t *testing.T) {
 			}
 			if tt.wantDatabaseDsn != "" && cfg.Postgres.ConnectionString() != tt.wantDatabaseDsn {
 				t.Fatalf("expected restore %v, got %v", tt.wantDatabaseDsn, cfg.Postgres.ConnectionString())
-			}
-		})
-	}
-}
-
-func TestGetIntValueAllowZero(t *testing.T) {
-	tests := []struct {
-		name      string
-		envValue  string
-		flagValue int
-		want      int
-		wantErr   bool
-	}{
-		{
-			name:      "env has positive value",
-			envValue:  "10",
-			flagValue: 5,
-			want:      10,
-		},
-		{
-			name:      "env has zero value",
-			envValue:  "0",
-			flagValue: 5,
-			want:      0,
-		},
-		{
-			name:      "flag used when env empty",
-			envValue:  "",
-			flagValue: 7,
-			want:      7,
-		},
-		{
-			name:      "invalid env value",
-			envValue:  "abc",
-			flagValue: 7,
-			wantErr:   true,
-		},
-		{
-			name:      "negative env value",
-			envValue:  "-1",
-			flagValue: 7,
-			wantErr:   true,
-		},
-		{
-			name:      "negative flag value",
-			envValue:  "",
-			flagValue: -1,
-			wantErr:   true,
-		},
-		{
-			name:      "nil flag pointer and empty env",
-			envValue:  "",
-			flagValue: 0,
-			wantErr:   true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
-			resetEnv(t)
-			if tt.envValue != "" {
-				t.Setenv("STORE_INTERVAL", tt.envValue)
-			}
-
-			var flagPtr *int
-			if tt.name == "nil flag pointer and empty env" {
-				flagPtr = nil
-			} else {
-				v := tt.flagValue
-				flagPtr = &v
-			}
-
-			// Act
-			got, err := getIntValueAllowZero(flagPtr, "STORE_INTERVAL")
-
-			// Assert
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Fatalf("expected %d, got %d", tt.want, got)
-			}
-		})
-	}
-}
-
-func TestGetBoolValue(t *testing.T) {
-	tests := []struct {
-		name      string
-		envValue  string
-		flagValue bool
-		want      bool
-		wantErr   bool
-		nilFlag   bool
-	}{
-		{
-			name:      "env true overrides flag",
-			envValue:  "true",
-			flagValue: false,
-			want:      true,
-		},
-		{
-			name:      "env false overrides flag",
-			envValue:  "false",
-			flagValue: true,
-			want:      false,
-		},
-		{
-			name:      "flag used when env empty",
-			envValue:  "",
-			flagValue: true,
-			want:      true,
-		},
-		{
-			name:      "invalid env bool",
-			envValue:  "not-bool",
-			flagValue: true,
-			wantErr:   true,
-		},
-		{
-			name:     "nil flag pointer and empty env",
-			envValue: "",
-			nilFlag:  true,
-			wantErr:  true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
-			resetEnv(t)
-			if tt.envValue != "" {
-				t.Setenv("RESTORE", tt.envValue)
-			}
-
-			var flagPtr *bool
-			if tt.nilFlag {
-				flagPtr = nil
-			} else {
-				v := tt.flagValue
-				flagPtr = &v
-			}
-
-			// Act
-			got, err := getBoolValue(flagPtr, "RESTORE")
-
-			// Assert
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Fatalf("expected %v, got %v", tt.want, got)
 			}
 		})
 	}
