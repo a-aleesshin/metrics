@@ -194,6 +194,11 @@ func buildPostgresStorageRuntime(ctx context.Context, cfg *cli.ServerConfig) (*s
 		return nil, fmt.Errorf("create postgres pool: %w", err)
 	}
 
+	if err := platformpostgres.Migrate(cfg.Postgres.ConnectionStringDsn(), "migrations"); err != nil {
+		postgresPool.Close()
+		return nil, fmt.Errorf("migrate postgres: %w", err)
+	}
+
 	metricRepo := storagepostgres.NewPostgresStorage(postgresPool)
 	queryRepo := storagepostgres.NewQueryPostgresStorage(postgresPool)
 	postgresChecker := platformpostgres.NewHealthChecker(postgresPool)

@@ -113,7 +113,7 @@ func (p PostgresStorage) SaveCounter(counter *metric.Counter) error {
 			INSERT INTO metric (id, name, type, gauge_value, counter_value) VALUES ($1, $2, $3, NULL, $4)
 			ON CONFLICT (name, type)
 			DO UPDATE SET
-				counter_value = EXCLUDED.counter_value,
+				counter_value = metric.counter_value + EXCLUDED.counter_value,
 				gauge_value = NULL,
 				updated_at = now()
 			`
@@ -155,7 +155,7 @@ func (p PostgresStorage) Save(metrics []repository.MetricSnapshot) error {
 		ON CONFLICT (name, type)
 		DO UPDATE SET
 			gauge_value = EXCLUDED.gauge_value,
-			counter_value = EXCLUDED.counter_value,
+			counter_value = metric.counter_value + EXCLUDED.counter_value,
 			updated_at = now()
 	`
 

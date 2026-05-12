@@ -123,7 +123,7 @@ func (q QueryPostgresStorage) FindCounterByName(name metric.Name) (delta int64, 
 
 	errSql := q.pool.QueryRow(
 		context.Background(),
-		"SELECT id, name, gauge_value FROM metric WHERE metric.name = $1 AND metric.type = $2",
+		"SELECT id, name, counter_value FROM metric WHERE metric.name = $1 AND metric.type = $2",
 		name.String(),
 		metricTypeCounter,
 	).Scan(&id, &metricName, &value)
