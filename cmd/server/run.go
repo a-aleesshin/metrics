@@ -14,6 +14,7 @@ import (
 	platformpostgres "github.com/a-aleesshin/metrics/internal/platform/db/postgres"
 	"github.com/a-aleesshin/metrics/internal/platform/health"
 	sharedrouter "github.com/a-aleesshin/metrics/internal/platform/http"
+	"github.com/a-aleesshin/metrics/internal/platform/id"
 	"github.com/a-aleesshin/metrics/internal/platform/logger"
 	"github.com/a-aleesshin/metrics/internal/server/application/mapper"
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
@@ -22,7 +23,8 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/infra/persistence/memory"
 	storagepostgres "github.com/a-aleesshin/metrics/internal/server/infra/persistence/postgres"
 	"github.com/a-aleesshin/metrics/internal/server/transport/cli"
-	"github.com/a-aleesshin/metrics/internal/server/transport/http/metrics"
+	"github.com/a-aleesshin/metrics/internal/server/transport/http/handlers/healths"
+	"github.com/a-aleesshin/metrics/internal/server/transport/http/handlers/metrics"
 	"github.com/a-aleesshin/metrics/internal/server/transport/http/middleware"
 	"go.uber.org/zap"
 )
@@ -33,6 +35,7 @@ type storageRuntime struct {
 	healthService *health.Service
 	snapshotSaver usecase.SnapshotSaver
 	periodicSaver usecase.SnapshotSaver
+	batchRepo     repository.MetricBatchRepository
 	cleanup       func()
 }
 
@@ -66,12 +69,34 @@ func run(cfg *cli.ServerConfig) error {
 	getValueMetricUC := usecase.NewGetValueMetricUseCase(runtime.queryRepo)
 	listMetricsUC := usecase.NewListMetricUseCase(runtime.queryRepo)
 
-	metricsHandler := metrics.NewHandler(
-		updateMetricsUC,
-		getValueMetricUC,
-		listMetricsUC,
-		runtime.healthService,
+	// TODO спорный случай, на данный момент uuid сущности не нужен, но я пока его оставлю
+	idGenerator := id.NewUUIDV7Generator()
+
+	updatesMetricsUC := usecase.NewUpdatesMetricsUseCase(
+		runtime.batchRepo,
+		idGenerator,
 	)
+
+	updateHandler := metrics.NewUpdateHandler(updateMetricsUC)
+	updateJSONHandler := metrics.NewUpdateJsonHandler(updateMetricsUC)
+	updatesHandler := metrics.NewUpdatesHandler(updatesMetricsUC)
+
+	valueHandler := metrics.NewValueHandler(getValueMetricUC)
+	valueJSONHandler := metrics.NewValueJsonHandler(getValueMetricUC)
+
+	listHandler := metrics.NewListMetricsHandler(listMetricsUC)
+
+	metricsHandler := metrics.NewHandler(
+		updateHandler,
+		updateJSONHandler,
+		updatesHandler,
+		valueHandler,
+		valueJSONHandler,
+		listHandler,
+	)
+
+	pingHandler := healths.NewPingHandler(runtime.healthService)
+	healthHandler := healths.NewHandler(pingHandler)
 
 	router := sharedrouter.New(
 		[]func(http.Handler) http.Handler{
@@ -80,6 +105,7 @@ func run(cfg *cli.ServerConfig) error {
 			middleware.RequestLogger(loggers.logger),
 		},
 		metricsHandler,
+		healthHandler,
 	)
 
 	server := &http.Server{
@@ -202,6 +228,7 @@ func buildPostgresStorageRuntime(ctx context.Context, cfg *cli.ServerConfig) (*s
 	metricRepo := storagepostgres.NewPostgresStorage(postgresPool)
 	queryRepo := storagepostgres.NewQueryPostgresStorage(postgresPool)
 	postgresChecker := platformpostgres.NewHealthChecker(postgresPool)
+	batchRepo := storagepostgres.NewBatchRepository(postgresPool)
 
 	return &storageRuntime{
 		metricRepo:    metricRepo,
@@ -209,6 +236,7 @@ func buildPostgresStorageRuntime(ctx context.Context, cfg *cli.ServerConfig) (*s
 		healthService: health.NewService(postgresChecker),
 		snapshotSaver: nil,
 		periodicSaver: nil,
+		batchRepo:     batchRepo,
 		cleanup:       postgresPool.Close,
 	}, nil
 }
@@ -256,6 +284,7 @@ func buildFileStorageRuntime(cfg *cli.ServerConfig) (*storageRuntime, error) {
 		healthService: health.NewService(),
 		snapshotSaver: snapshotSaver,
 		periodicSaver: periodicSaver,
+		batchRepo:     storage,
 		cleanup:       func() {},
 	}, nil
 }
@@ -269,6 +298,7 @@ func buildMemoryStorageRuntime() *storageRuntime {
 		healthService: health.NewService(),
 		snapshotSaver: nil,
 		periodicSaver: nil,
+		batchRepo:     storage,
 		cleanup:       func() {},
 	}
 }

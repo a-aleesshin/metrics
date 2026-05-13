@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"sync"
 
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
@@ -180,4 +181,36 @@ func (m *MemStorage) GetAllMetrics() (repository.MetricsState, error) {
 	}
 
 	return state, nil
+}
+
+func (m *MemStorage) UpdateBatch(ctx context.Context, batch repository.MetricBatch) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, gauge := range batch.Gauges {
+		m.gauges[gauge.Name().String()] = gaugeRecord{
+			ID:    gauge.Id().String(),
+			Name:  gauge.Name().String(),
+			Value: gauge.Value(),
+		}
+	}
+
+	for _, counter := range batch.Counters {
+		name := counter.Name().String()
+
+		rec, ok := m.counter[name]
+		if !ok {
+			m.counter[name] = counterRecord{
+				ID:    counter.Id().String(),
+				Name:  name,
+				Delta: counter.Delta(),
+			}
+			continue
+		}
+
+		rec.Delta += counter.Delta()
+		m.counter[name] = rec
+	}
+
+	return nil
 }

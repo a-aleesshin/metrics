@@ -24,6 +24,8 @@ func (usecase *ReportMetricsUseCase) Execute() error {
 		return err
 	}
 
+	batch := make([]dto.MetricDTO, 0, len(metrics.Gauges)+len(metrics.Counters))
+
 	for _, metric := range metrics.Gauges {
 		metricDTO := dto.MetricDTO{
 			Type:  "gauge",
@@ -31,11 +33,7 @@ func (usecase *ReportMetricsUseCase) Execute() error {
 			Value: strconv.FormatFloat(metric.Value(), 'f', -1, 64),
 		}
 
-		err = usecase.sender.Send(metricDTO)
-
-		if err != nil {
-			return err
-		}
+		batch = append(batch, metricDTO)
 	}
 
 	for _, metric := range metrics.Counters {
@@ -45,11 +43,17 @@ func (usecase *ReportMetricsUseCase) Execute() error {
 			Value: strconv.FormatInt(metric.Value(), 10),
 		}
 
-		err = usecase.sender.Send(metricDTO)
+		batch = append(batch, metricDTO)
+	}
 
-		if err != nil {
-			return err
-		}
+	if len(batch) == 0 {
+		return nil
+	}
+
+	err = usecase.sender.SendBatch(batch)
+
+	if err != nil {
+		return err
 	}
 
 	return nil

@@ -62,7 +62,7 @@ func TestHandler_List(t *testing.T) {
 				result: tt.useCaseResult,
 				err:    tt.useCaseErr,
 			}
-			h := NewHandler(updateUseCaseNoop{}, valueUseCaseNoop{}, listSpy, healthService{})
+			h := NewListMetricsHandler(listSpy)
 
 			r := chi.NewRouter()
 			r.Get("/", h.List)

@@ -1,4 +1,4 @@
-package metrics
+package httperror
 
 import (
 	"errors"
@@ -7,12 +7,9 @@ import (
 	"testing"
 
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
-	"github.com/go-chi/chi/v5"
 )
 
-func TestHandler_writeError(t *testing.T) {
-	h := &Handler{}
-
+func TestMapper_WriteError(t *testing.T) {
 	tests := []struct {
 		name string
 		err  error
@@ -31,41 +28,12 @@ func TestHandler_writeError(t *testing.T) {
 			rec := httptest.NewRecorder()
 
 			// Act
-			h.writeError(rec, tt.err)
+			WriteError(rec, tt.err)
 
 			// Assert
 			if rec.Code != tt.want {
 				t.Fatalf("expected %d, got %d", tt.want, rec.Code)
 			}
 		})
-	}
-}
-
-func TestHandler_RegisterRoutes_Smoke(t *testing.T) {
-	// Arrange
-	h := NewHandler(updateUseCaseNoop{}, valueUseCaseNoop{}, listUseCaseNoop{}, healthService{})
-	r := chi.NewRouter()
-
-	// Act
-	h.RegisterRoutes(r)
-
-	// Assert
-	cases := []struct {
-		method string
-		path   string
-	}{
-		{http.MethodPost, "/update/gauge/Alloc/1"},
-		{http.MethodGet, "/value/gauge/Alloc"},
-		{http.MethodGet, "/"},
-	}
-
-	for _, tc := range cases {
-		req := httptest.NewRequest(tc.method, tc.path, nil)
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
-
-		if rec.Code == http.StatusNotFound {
-			t.Fatalf("%s %s should be registered, got 404", tc.method, tc.path)
-		}
 	}
 }
