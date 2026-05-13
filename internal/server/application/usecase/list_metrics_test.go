@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -15,7 +16,7 @@ type metricQueryRepositoryStub struct {
 	listCountersErr error
 }
 
-func (m metricQueryRepositoryStub) ListGauges() ([]repository.GaugeSnapshot, error) {
+func (m metricQueryRepositoryStub) ListGauges(ctx context.Context) ([]repository.GaugeSnapshot, error) {
 	if m.listGaugesErr != nil {
 		return nil, m.listGaugesErr
 	}
@@ -23,7 +24,7 @@ func (m metricQueryRepositoryStub) ListGauges() ([]repository.GaugeSnapshot, err
 	return m.gauges, nil
 }
 
-func (m metricQueryRepositoryStub) ListCounters() ([]repository.CounterSnapshot, error) {
+func (m metricQueryRepositoryStub) ListCounters(ctx context.Context) ([]repository.CounterSnapshot, error) {
 	if m.listCountersErr != nil {
 		return nil, m.listCountersErr
 	}
@@ -31,11 +32,11 @@ func (m metricQueryRepositoryStub) ListCounters() ([]repository.CounterSnapshot,
 	return m.counters, nil
 }
 
-func (m metricQueryRepositoryStub) FindGaugeByName(name metric.Name) (value float64, found bool, err error) {
+func (m metricQueryRepositoryStub) FindGaugeByName(ctx context.Context, name metric.Name) (value float64, found bool, err error) {
 	return 0, false, nil
 }
 
-func (m metricQueryRepositoryStub) FindCounterByName(name metric.Name) (delta int64, found bool, err error) {
+func (m metricQueryRepositoryStub) FindCounterByName(ctx context.Context, name metric.Name) (delta int64, found bool, err error) {
 	return 0, false, nil
 }
 
@@ -91,7 +92,7 @@ func TestListMetrics_Execute(t *testing.T) {
 			uc := NewListMetricUseCase(test.repo)
 
 			// Act
-			items, err := uc.Execute()
+			items, err := uc.Execute(context.Background())
 
 			// Assert
 			if test.wantErr {

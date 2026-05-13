@@ -10,15 +10,21 @@ import (
 
 type updateUseCaseNoop struct{}
 
-func (updateUseCaseNoop) Execute(command usecase.UpdateMetricCommand) error { return nil }
+func (updateUseCaseNoop) Execute(ctx context.Context, command usecase.UpdateMetricCommand) error {
+	return nil
+}
 
 type listUseCaseNoop struct{}
 
-func (listUseCaseNoop) Execute() (dto.ListMetricsResult, error) { return dto.ListMetricsResult{}, nil }
+func (listUseCaseNoop) Execute(ctx context.Context) (dto.ListMetricsResult, error) {
+	return dto.ListMetricsResult{}, nil
+}
 
 type valueUseCaseNoop struct{}
 
-func (valueUseCaseNoop) Execute(cmd usecase.ValueMetricCommand) (string, error) { return "", nil }
+func (valueUseCaseNoop) Execute(ctx context.Context, cmd usecase.ValueMetricCommand) (string, error) {
+	return "", nil
+}
 
 type healthService struct{}
 

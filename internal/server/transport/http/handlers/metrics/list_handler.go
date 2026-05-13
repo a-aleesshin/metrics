@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 
@@ -8,7 +9,7 @@ import (
 )
 
 type ListMetricsUseCase interface {
-	Execute() (dto.ListMetricsResult, error)
+	Execute(ctx context.Context) (dto.ListMetricsResult, error)
 }
 
 type ListMetricsHandler struct {
@@ -20,7 +21,7 @@ func NewListMetricsHandler(listMetric ListMetricsUseCase) *ListMetricsHandler {
 }
 
 func (h *ListMetricsHandler) List(w http.ResponseWriter, r *http.Request) {
-	result, err := h.listMetric.Execute()
+	result, err := h.listMetric.Execute(r.Context())
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

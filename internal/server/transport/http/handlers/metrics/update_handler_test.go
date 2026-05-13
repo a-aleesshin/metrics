@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func (u *updateMetricUseCaseSpy) Execute(command usecase.UpdateMetricCommand) error {
+func (u *updateMetricUseCaseSpy) Execute(ctx context.Context, command usecase.UpdateMetricCommand) error {
 	u.called = true
 	u.command = command
 	return u.err

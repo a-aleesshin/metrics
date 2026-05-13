@@ -60,7 +60,7 @@ func (h *UpdateJsonHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 		Value: rawValue,
 	}
 
-	err := h.updateMetric.Execute(command)
+	err := h.updateMetric.Execute(r.Context(), command)
 
 	if err != nil {
 		httperror.WriteError(w, err)

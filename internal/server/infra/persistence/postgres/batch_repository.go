@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	platformpostgres "github.com/a-aleesshin/metrics/internal/platform/db/postgres"
+	"github.com/a-aleesshin/metrics/internal/platform/retry"
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -17,15 +19,32 @@ func NewBatchRepository(pool *pgxpool.Pool) *BatchRepository {
 }
 
 func (b BatchRepository) UpdateBatch(ctx context.Context, batch repository.MetricBatch) error {
-	tx, err := b.pool.Begin(ctx)
+	err := retry.Do(ctx, platformpostgres.IsRetriable, func() error {
+		if err := b.updateBatch(ctx, batch); err != nil {
+			return err
+		}
+
+		return nil
+	})
 
 	if err != nil {
-		return err
+		return fmt.Errorf("update metric batch: %w", err)
 	}
 
-	defer tx.Rollback(ctx)
+	return nil
+}
 
-	gaugeSql := `
+func (b BatchRepository) updateBatch(ctx context.Context, batch repository.MetricBatch) error {
+	tx, err := b.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin batch tx: %w", err)
+	}
+
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	const gaugeSQL = `
 		INSERT INTO metric (id, name, type, gauge_value, counter_value)
 		VALUES ($1, $2, $3, $4, NULL)
 		ON CONFLICT (name, type)
@@ -36,22 +55,20 @@ func (b BatchRepository) UpdateBatch(ctx context.Context, batch repository.Metri
 	`
 
 	for _, gauge := range batch.Gauges {
-		_, err := tx.Exec(
+		if _, err := tx.Exec(
 			ctx,
-			gaugeSql,
+			gaugeSQL,
 			gauge.Id().String(),
 			gauge.Name().String(),
 			metricTypeGauge,
 			gauge.Value(),
-		)
-
-		if err != nil {
+		); err != nil {
 			return fmt.Errorf("save gauge %q in batch: %w", gauge.Name().String(), err)
 		}
 	}
 
-	counterSql := `
-	INSERT INTO metric (id, name, type, gauge_value, counter_value)
+	const counterSQL = `
+		INSERT INTO metric (id, name, type, gauge_value, counter_value)
 		VALUES ($1, $2, $3, NULL, $4)
 		ON CONFLICT (name, type)
 		DO UPDATE SET
@@ -61,16 +78,14 @@ func (b BatchRepository) UpdateBatch(ctx context.Context, batch repository.Metri
 	`
 
 	for _, counter := range batch.Counters {
-		_, err := tx.Exec(
+		if _, err := tx.Exec(
 			ctx,
-			counterSql,
+			counterSQL,
 			counter.Id().String(),
 			counter.Name().String(),
 			metricTypeCounter,
 			counter.Delta(),
-		)
-
-		if err != nil {
+		); err != nil {
 			return fmt.Errorf("save counter %q in batch: %w", counter.Name().String(), err)
 		}
 	}

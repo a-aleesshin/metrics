@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -27,14 +28,14 @@ func (nopLogger) Info(string, ...sharedlog.Field) {}
 
 func (nopLogger) Error(string, ...sharedlog.Field) {}
 
-func (m *metricRepositoryStub) GetGaugeByName(name metric.Name) (*metric.Gauge, error) {
+func (m *metricRepositoryStub) GetGaugeByName(ctx context.Context, name metric.Name) (*metric.Gauge, error) {
 	if m.getGaugeErr != nil {
 		return nil, m.getGaugeErr
 	}
 	return m.gaugeByName, nil
 }
 
-func (m *metricRepositoryStub) SaveGauge(gauge *metric.Gauge) error {
+func (m *metricRepositoryStub) SaveGauge(ctx context.Context, gauge *metric.Gauge) error {
 	if m.saveGaugeErr != nil {
 		return m.saveGaugeErr
 	}
@@ -42,14 +43,14 @@ func (m *metricRepositoryStub) SaveGauge(gauge *metric.Gauge) error {
 	return nil
 }
 
-func (m *metricRepositoryStub) GetCounterByName(name metric.Name) (*metric.Counter, error) {
+func (m *metricRepositoryStub) GetCounterByName(ctx context.Context, name metric.Name) (*metric.Counter, error) {
 	if m.getCounterErr != nil {
 		return nil, m.getCounterErr
 	}
 	return m.counterByName, nil
 }
 
-func (m *metricRepositoryStub) SaveCounter(counter *metric.Counter) error {
+func (m *metricRepositoryStub) SaveCounter(ctx context.Context, counter *metric.Counter) error {
 	if m.saveCounterErr != nil {
 		return m.saveCounterErr
 	}
@@ -62,7 +63,7 @@ type snapshotSaverStub struct {
 	err   error
 }
 
-func (s *snapshotSaverStub) Execute() error {
+func (s *snapshotSaverStub) Execute(ctx context.Context) error {
 	s.calls++
 	return s.err
 }
@@ -218,7 +219,7 @@ func TestUpdateMetric_Execute(t *testing.T) {
 			uc := NewUpdateMetric(tt.repo, tt.logger, nil)
 
 			// Act
-			err := uc.Execute(tt.command)
+			err := uc.Execute(context.Background(), tt.command)
 
 			// Assert
 			if tt.wantErr != nil {
@@ -267,7 +268,7 @@ func TestUpdateMetric_Execute_WithSnapshotSaver(t *testing.T) {
 	saver := &snapshotSaverStub{}
 	uc := NewUpdateMetric(repo, nopLogger{}, saver)
 
-	err := uc.Execute(UpdateMetricCommand{
+	err := uc.Execute(context.Background(), UpdateMetricCommand{
 		Type: "gauge", Name: "Alloc", Value: "1.23",
 	})
 
@@ -287,7 +288,7 @@ func TestUpdateMetric_Execute_SnapshotSaverNotCalledOnRepoSaveError(t *testing.T
 	saver := &snapshotSaverStub{}
 	uc := NewUpdateMetric(repo, nopLogger{}, saver)
 
-	err := uc.Execute(UpdateMetricCommand{
+	err := uc.Execute(context.Background(), UpdateMetricCommand{
 		Type: "gauge", Name: "Alloc", Value: "1.23",
 	})
 
@@ -307,7 +308,7 @@ func TestUpdateMetric_Execute_SnapshotSaverErrorIsNonFatal(t *testing.T) {
 	}
 	uc := NewUpdateMetric(repo, nopLogger{}, saver)
 
-	err := uc.Execute(UpdateMetricCommand{
+	err := uc.Execute(context.Background(), UpdateMetricCommand{
 		Type: "gauge", Name: "Alloc", Value: "1.23",
 	})
 

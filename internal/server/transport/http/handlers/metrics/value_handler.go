@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -11,7 +12,7 @@ import (
 )
 
 type ValueMetricUseCase interface {
-	Execute(cmd usecase.ValueMetricCommand) (string, error)
+	Execute(ctx context.Context, cmd usecase.ValueMetricCommand) (string, error)
 }
 
 type ValueHandler struct {
@@ -31,7 +32,7 @@ func (h *ValueHandler) Value(w http.ResponseWriter, r *http.Request) {
 		Name: name,
 	}
 
-	result, err := h.getValueMetric.Execute(command)
+	result, err := h.getValueMetric.Execute(r.Context(), command)
 
 	if err != nil {
 		switch {

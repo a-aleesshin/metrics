@@ -3,14 +3,15 @@ package httpadapter
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/a-aleesshin/metrics/internal/agent/application/dto"
 	dto2 "github.com/a-aleesshin/metrics/internal/agent/infra/dto"
 	"github.com/a-aleesshin/metrics/internal/agent/infra/mapper"
+	"github.com/a-aleesshin/metrics/internal/platform/retry"
 )
 
 type MetricSender struct {
@@ -37,41 +38,7 @@ func (m *MetricSender) Send(dto dto.MetricDTO) error {
 		return err
 	}
 
-	var gzBuf bytes.Buffer
-	gz := gzip.NewWriter(&gzBuf)
-
-	if _, err := gz.Write(body); err != nil {
-		_ = gz.Close()
-		return err
-	}
-
-	if err := gz.Close(); err != nil {
-		return err
-	}
-
-	request, err := http.NewRequest(http.MethodPost, m.url+"/update", &gzBuf)
-
-	if err != nil {
-		return err
-	}
-
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Content-Encoding", "gzip")
-	request.Header.Set("Accept-Encoding", "gzip")
-
-	response, err := m.client.Do(request)
-
-	if err != nil {
-		return err
-	}
-
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", response.StatusCode)
-	}
-
-	return nil
+	return m.sendGzippedJSON("/update", body)
 }
 
 func (m *MetricSender) SendBatch(metrics []dto.MetricDTO) error {
@@ -96,6 +63,17 @@ func (m *MetricSender) SendBatch(metrics []dto.MetricDTO) error {
 		return err
 	}
 
+	return m.sendGzippedJSON("/updates", body)
+}
+
+func normalizeBaseURL(addr string) string {
+	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
+		addr = "http://" + addr
+	}
+	return strings.TrimRight(addr, "/")
+}
+
+func (m *MetricSender) sendGzippedJSON(path string, body []byte) error {
 	var gzBuf bytes.Buffer
 	gz := gzip.NewWriter(&gzBuf)
 
@@ -108,34 +86,32 @@ func (m *MetricSender) SendBatch(metrics []dto.MetricDTO) error {
 		return err
 	}
 
-	request, err := http.NewRequest(http.MethodPost, m.url+"/updates", &gzBuf)
+	gzBody := gzBuf.Bytes()
 
-	if err != nil {
-		return err
-	}
+	return retry.Do(context.Background(), isRetriableHTTPError, func() error {
+		request, err := http.NewRequest(
+			http.MethodPost,
+			m.url+path,
+			bytes.NewReader(gzBody),
+		)
+		if err != nil {
+			return err
+		}
 
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Content-Encoding", "gzip")
-	request.Header.Set("Accept-Encoding", "gzip")
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Content-Encoding", "gzip")
+		request.Header.Set("Accept-Encoding", "gzip")
 
-	response, err := m.client.Do(request)
+		response, err := m.client.Do(request)
+		if err != nil {
+			return err
+		}
+		defer response.Body.Close()
 
-	if err != nil {
-		return err
-	}
+		if response.StatusCode != http.StatusOK {
+			return unexpectedStatusError{code: response.StatusCode}
+		}
 
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", response.StatusCode)
-	}
-
-	return nil
-}
-
-func normalizeBaseURL(addr string) string {
-	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
-		addr = "http://" + addr
-	}
-	return strings.TrimRight(addr, "/")
+		return nil
+	})
 }

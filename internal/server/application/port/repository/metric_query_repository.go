@@ -1,6 +1,10 @@
 package repository
 
-import "github.com/a-aleesshin/metrics/internal/server/domain/metric"
+import (
+	"context"
+
+	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
+)
 
 type GaugeSnapshot struct {
 	Name  string
@@ -13,9 +17,9 @@ type CounterSnapshot struct {
 }
 
 type MetricQueryRepository interface {
-	ListGauges() ([]GaugeSnapshot, error)
-	ListCounters() ([]CounterSnapshot, error)
+	ListGauges(ctx context.Context) ([]GaugeSnapshot, error)
+	ListCounters(ctx context.Context) ([]CounterSnapshot, error)
 
-	FindGaugeByName(name metric.Name) (value float64, found bool, err error)
-	FindCounterByName(name metric.Name) (delta int64, found bool, err error)
+	FindGaugeByName(ctx context.Context, name metric.Name) (value float64, found bool, err error)
+	FindCounterByName(ctx context.Context, name metric.Name) (delta int64, found bool, err error)
 }

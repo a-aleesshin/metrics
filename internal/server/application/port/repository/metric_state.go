@@ -1,6 +1,10 @@
 package repository
 
-import "github.com/a-aleesshin/metrics/internal/server/domain/metric"
+import (
+	"context"
+
+	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
+)
 
 type MetricsState struct {
 	Counters []*metric.Counter
@@ -8,5 +12,5 @@ type MetricsState struct {
 }
 
 type MetricStateRepository interface {
-	GetAllMetrics() (MetricsState, error)
+	GetAllMetrics(ctx context.Context) (MetricsState, error)
 }

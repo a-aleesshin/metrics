@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
@@ -22,8 +23,8 @@ func NewSaveMetricSnapshotUseCase(repositoryState repository.MetricStateReposito
 	}
 }
 
-func (u *SaveMetricSnapshotUseCase) Execute() error {
-	metrics, err := u.repositoryState.GetAllMetrics()
+func (u *SaveMetricSnapshotUseCase) Execute(ctx context.Context) error {
+	metrics, err := u.repositoryState.GetAllMetrics(ctx)
 
 	if err != nil {
 		return fmt.Errorf("get all metrics: %w", err)
@@ -58,7 +59,7 @@ func (u *SaveMetricSnapshotUseCase) Execute() error {
 		return snapshots[i].Type < snapshots[j].Type
 	})
 
-	if err := u.repositorySnapshot.Save(snapshots); err != nil {
+	if err := u.repositorySnapshot.Save(ctx, snapshots); err != nil {
 		return fmt.Errorf("error save snapshot: %w", err)
 	}
 

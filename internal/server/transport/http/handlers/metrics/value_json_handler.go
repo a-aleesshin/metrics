@@ -37,7 +37,7 @@ func (h *ValueJsonHandler) ValueJSON(w http.ResponseWriter, r *http.Request) {
 		Name: req.ID,
 	}
 
-	result, err := h.getValueMetric.Execute(command)
+	result, err := h.getValueMetric.Execute(r.Context(), command)
 
 	if err != nil {
 		switch {

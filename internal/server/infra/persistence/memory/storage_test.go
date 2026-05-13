@@ -27,7 +27,7 @@ func TestMemStorage_GaugeOperations(t *testing.T) {
 					t.Fatalf("unexpected setup error: %v", err)
 				}
 
-				if err := storage.SaveGauge(gauge); err != nil {
+				if err := storage.SaveGauge(context.Background(), gauge); err != nil {
 					t.Fatalf("unexpected save error: %v", err)
 				}
 			},
@@ -57,7 +57,7 @@ func TestMemStorage_GaugeOperations(t *testing.T) {
 			}
 
 			// Act
-			got, err := storage.GetGaugeByName(name)
+			got, err := storage.GetGaugeByName(context.Background(), name)
 
 			// Assert
 			if err != nil {
@@ -108,7 +108,7 @@ func TestMemStorage_CounterOperations(t *testing.T) {
 					t.Fatalf("unexpected setup error: %v", err)
 				}
 
-				if err := storage.SaveCounter(counter); err != nil {
+				if err := storage.SaveCounter(context.Background(), counter); err != nil {
 					t.Fatalf("unexpected save error: %v", err)
 				}
 			},
@@ -138,7 +138,7 @@ func TestMemStorage_CounterOperations(t *testing.T) {
 			}
 
 			// Act
-			got, err := storage.GetCounterByName(name)
+			got, err := storage.GetCounterByName(context.Background(), name)
 
 			// Assert
 			if err != nil {
@@ -189,7 +189,7 @@ func TestMemStorage_FindGaugeByName(t *testing.T) {
 			name: "found",
 			prepare: func(t *testing.T, s *MemStorage) {
 				g, _ := metric.NewGauge("g1", "Alloc", 123.45)
-				_ = s.SaveGauge(g)
+				_ = s.SaveGauge(context.Background(), g)
 			},
 			lookup:    "Alloc",
 			wantFound: true,
@@ -205,7 +205,7 @@ func TestMemStorage_FindGaugeByName(t *testing.T) {
 			name, _ := metric.NewName(tt.lookup)
 
 			// Act
-			gotValue, gotFound, err := s.FindGaugeByName(name)
+			gotValue, gotFound, err := s.FindGaugeByName(context.Background(), name)
 
 			// Assert
 			if err != nil {
@@ -239,7 +239,7 @@ func TestMemStorage_FindCounterByName(t *testing.T) {
 			name: "found",
 			prepare: func(t *testing.T, s *MemStorage) {
 				c, _ := metric.NewCounter("c1", "PollCount", 7)
-				_ = s.SaveCounter(c)
+				_ = s.SaveCounter(context.Background(), c)
 			},
 			lookup:    "PollCount",
 			wantFound: true,
@@ -255,7 +255,7 @@ func TestMemStorage_FindCounterByName(t *testing.T) {
 			name, _ := metric.NewName(tt.lookup)
 
 			// Act
-			gotDelta, gotFound, err := s.FindCounterByName(name)
+			gotDelta, gotFound, err := s.FindCounterByName(context.Background(), name)
 
 			// Assert
 			if err != nil {
@@ -289,8 +289,8 @@ func TestMemStorage_ListGauges(t *testing.T) {
 			prepare: func(t *testing.T, s *MemStorage) {
 				g1, _ := metric.NewGauge("g1", "Alloc", 10.5)
 				g2, _ := metric.NewGauge("g2", "HeapInuse", 42)
-				_ = s.SaveGauge(g1)
-				_ = s.SaveGauge(g2)
+				_ = s.SaveGauge(context.Background(), g1)
+				_ = s.SaveGauge(context.Background(), g2)
 			},
 			wantCount: 2,
 			wantByKey: map[string]float64{
@@ -307,7 +307,7 @@ func TestMemStorage_ListGauges(t *testing.T) {
 			tt.prepare(t, s)
 
 			// Act
-			got, err := s.ListGauges()
+			got, err := s.ListGauges(context.Background())
 
 			// Assert
 			if err != nil {
@@ -356,8 +356,8 @@ func TestMemStorage_ListCounters(t *testing.T) {
 			prepare: func(t *testing.T, s *MemStorage) {
 				c1, _ := metric.NewCounter("c1", "PollCount", 3)
 				c2, _ := metric.NewCounter("c2", "Requests", 9)
-				_ = s.SaveCounter(c1)
-				_ = s.SaveCounter(c2)
+				_ = s.SaveCounter(context.Background(), c1)
+				_ = s.SaveCounter(context.Background(), c2)
 			},
 			wantCount: 2,
 			wantByKey: map[string]int64{
@@ -374,7 +374,7 @@ func TestMemStorage_ListCounters(t *testing.T) {
 			tt.prepare(t, s)
 
 			// Act
-			got, err := s.ListCounters()
+			got, err := s.ListCounters(context.Background())
 
 			// Assert
 			if err != nil {
@@ -428,10 +428,10 @@ func TestMemStorage_GetAllMetrics(t *testing.T) {
 				g2, _ := metric.NewGauge("g2", "HeapInuse", 42)
 				c1, _ := metric.NewCounter("c1", "PollCount", 3)
 				c2, _ := metric.NewCounter("c2", "Requests", 9)
-				_ = s.SaveGauge(g1)
-				_ = s.SaveGauge(g2)
-				_ = s.SaveCounter(c1)
-				_ = s.SaveCounter(c2)
+				_ = s.SaveGauge(context.Background(), g1)
+				_ = s.SaveGauge(context.Background(), g2)
+				_ = s.SaveCounter(context.Background(), c1)
+				_ = s.SaveCounter(context.Background(), c2)
 			},
 			wantGaugeLen: 2,
 			wantCtrLen:   2,
@@ -453,7 +453,7 @@ func TestMemStorage_GetAllMetrics(t *testing.T) {
 			tt.prepare(t, s)
 
 			// Act
-			got, err := s.GetAllMetrics()
+			got, err := s.GetAllMetrics(context.Background())
 
 			// Assert
 			if err != nil {
@@ -566,11 +566,11 @@ func TestMemStorage_UpdateBatch(t *testing.T) {
 				g, _ := metric.NewGauge("old-gauge-id", "Alloc", 10)
 				c, _ := metric.NewCounter("old-counter-id", "PollCount", 3)
 
-				if err := s.SaveGauge(g); err != nil {
+				if err := s.SaveGauge(context.Background(), g); err != nil {
 					t.Fatalf("unexpected save gauge error: %v", err)
 				}
 
-				if err := s.SaveCounter(c); err != nil {
+				if err := s.SaveCounter(context.Background(), c); err != nil {
 					t.Fatalf("unexpected save counter error: %v", err)
 				}
 			},
@@ -629,7 +629,7 @@ func TestMemStorage_UpdateBatch(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			state, err := s.GetAllMetrics()
+			state, err := s.GetAllMetrics(context.Background())
 			if err != nil {
 				t.Fatalf("unexpected get all metrics error: %v", err)
 			}

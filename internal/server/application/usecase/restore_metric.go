@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/a-aleesshin/metrics/internal/server/application/mapper"
@@ -21,33 +22,33 @@ func NewRestoreMetricUseCase(repository repository.MetricRepository, repositoryS
 	}
 }
 
-func (u *RestoreMetricUseCase) Execute() error {
-	snapshots, err := u.repositorySnapshot.Load()
+func (u *RestoreMetricUseCase) Execute(ctx context.Context) error {
+	snapshots, err := u.repositorySnapshot.Load(ctx)
 
 	if err != nil {
 		return fmt.Errorf("load snapshots: %w", err)
 	}
 
 	for i, snapshot := range snapshots {
-		g, c, err := u.mapper.SnapshotToDomain(snapshot)
+		gauge, counter, err := u.mapper.SnapshotToDomain(snapshot)
 
 		if err != nil {
 			return fmt.Errorf("convert snapshot %d to domain: %w", i, err)
 		}
 
-		if g == nil && c == nil {
+		if gauge == nil && counter == nil {
 			return fmt.Errorf("snapshot %d has no domain object", i)
 		}
 
-		if g != nil {
-			if err := u.repository.SaveGauge(g); err != nil {
+		if gauge != nil {
+			if err := u.repository.SaveGauge(ctx, gauge); err != nil {
 				return fmt.Errorf("save gauge %d: %w", i, err)
 			}
 
 			continue
 		}
 
-		if err := u.repository.SaveCounter(c); err != nil {
+		if err := u.repository.SaveCounter(ctx, counter); err != nil {
 			return fmt.Errorf("save counter %d: %w", i, err)
 		}
 	}

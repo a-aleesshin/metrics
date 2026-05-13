@@ -1,6 +1,7 @@
 package file
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,7 +29,7 @@ func NewSnapshotStore(path string) (*SnapshotStore, error) {
 	}, nil
 }
 
-func (ss *SnapshotStore) Save(metrics []repository.MetricSnapshot) error {
+func (ss *SnapshotStore) Save(ctx context.Context, metrics []repository.MetricSnapshot) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
@@ -81,7 +82,7 @@ func (ss *SnapshotStore) Save(metrics []repository.MetricSnapshot) error {
 	return nil
 }
 
-func (ss *SnapshotStore) Load() ([]repository.MetricSnapshot, error) {
+func (ss *SnapshotStore) Load(ctx context.Context) ([]repository.MetricSnapshot, error) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 

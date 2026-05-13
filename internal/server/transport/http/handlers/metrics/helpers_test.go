@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"context"
+
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
 )
 
@@ -17,7 +19,7 @@ type valueMetricsUseCaseSpy struct {
 	called  bool
 }
 
-func (s *valueMetricsUseCaseSpy) Execute(cmd usecase.ValueMetricCommand) (string, error) {
+func (s *valueMetricsUseCaseSpy) Execute(ctx context.Context, cmd usecase.ValueMetricCommand) (string, error) {
 	s.called = true
 	s.command = cmd
 	if s.err != nil {

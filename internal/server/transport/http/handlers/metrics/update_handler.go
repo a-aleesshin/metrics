@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
@@ -9,7 +10,7 @@ import (
 )
 
 type UpdateMetricsUseCase interface {
-	Execute(command usecase.UpdateMetricCommand) error
+	Execute(ctx context.Context, command usecase.UpdateMetricCommand) error
 }
 
 type UpdateHandler struct {
@@ -31,7 +32,7 @@ func (h *UpdateHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Value: value,
 	}
 
-	err := h.updateMetric.Execute(command)
+	err := h.updateMetric.Execute(r.Context(), command)
 
 	if err != nil {
 		httperror.WriteError(w, err)

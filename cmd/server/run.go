@@ -133,7 +133,7 @@ func startPeriodicSnapshot(ctx context.Context, interval time.Duration, saver us
 		for {
 			select {
 			case <-ticker.C:
-				if err := saver.Execute(); err != nil {
+				if err := saver.Execute(ctx); err != nil {
 					log.Printf("periodic snapshot save failed: %v", err)
 				}
 			case <-ctx.Done():
@@ -166,7 +166,7 @@ func serve(ctx context.Context, server *http.Server, finalSaver usecase.Snapshot
 		}
 
 		if finalSaver != nil {
-			if err := finalSaver.Execute(); err != nil {
+			if err := finalSaver.Execute(shutdownCtx); err != nil {
 				return fmt.Errorf("final snapshot save: %w", err)
 			}
 		}
@@ -201,7 +201,7 @@ func buildStorageRuntime(ctx context.Context, cfg *cli.ServerConfig) (*storageRu
 	case cli.StorageTypeMemory:
 		return buildMemoryStorageRuntime(), nil
 	case cli.StorageTypeFile:
-		return buildFileStorageRuntime(cfg)
+		return buildFileStorageRuntime(ctx, cfg)
 	case cli.StorageTypePostgres:
 		return buildPostgresStorageRuntime(ctx, cfg)
 	default:
@@ -241,7 +241,7 @@ func buildPostgresStorageRuntime(ctx context.Context, cfg *cli.ServerConfig) (*s
 	}, nil
 }
 
-func buildFileStorageRuntime(cfg *cli.ServerConfig) (*storageRuntime, error) {
+func buildFileStorageRuntime(ctx context.Context, cfg *cli.ServerConfig) (*storageRuntime, error) {
 	storage := memory.NewMemStorage()
 
 	snapshotStore, err := snapshotfile.NewSnapshotStore(cfg.FileStoragePath)
@@ -264,7 +264,7 @@ func buildFileStorageRuntime(cfg *cli.ServerConfig) (*storageRuntime, error) {
 	)
 
 	if cfg.Restore {
-		if err := restoreUC.Execute(); err != nil {
+		if err := restoreUC.Execute(ctx); err != nil {
 			return nil, fmt.Errorf("restore metrics: %w", err)
 		}
 	}
