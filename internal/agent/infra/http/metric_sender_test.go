@@ -295,3 +295,145 @@ func TestMetricSender_Send_UsesGzipRequestBody(t *testing.T) {
 		t.Fatalf("expected delta nil, got %+v", gotBody.Delta)
 	}
 }
+
+func TestMetricSender_SendBatch_JSON(t *testing.T) {
+	// Arrange
+	var gotMethod, gotPath, gotContentType string
+	var gotBody []dto2.MetricsSend
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		gotContentType = r.Header.Get("Content-Type")
+
+		if r.Header.Get("Content-Encoding") != "gzip" {
+			t.Fatalf("expected gzip content encoding, got %q", r.Header.Get("Content-Encoding"))
+		}
+
+		gr, err := gzip.NewReader(r.Body)
+		if err != nil {
+			t.Fatalf("failed to create gzip reader: %v", err)
+		}
+		defer gr.Close()
+
+		if err := json.NewDecoder(gr).Decode(&gotBody); err != nil {
+			t.Fatalf("failed to decode gzip json body: %v", err)
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	sender := NewMetricSender(ts.URL, ts.Client())
+
+	// Act
+	err := sender.SendBatch([]dto.MetricDTO{
+		{Type: "gauge", Name: "Alloc", Value: "123.45"},
+		{Type: "counter", Name: "PollCount", Value: "7"},
+	})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodPost {
+		t.Fatalf("expected method POST, got %s", gotMethod)
+	}
+	if gotPath != "/updates" {
+		t.Fatalf("expected path /updates, got %s", gotPath)
+	}
+	if !strings.Contains(gotContentType, "application/json") {
+		t.Fatalf("expected content-type application/json, got %q", gotContentType)
+	}
+	if len(gotBody) != 2 {
+		t.Fatalf("expected 2 metrics, got %d", len(gotBody))
+	}
+
+	if gotBody[0].ID != "Alloc" || gotBody[0].MType != "gauge" {
+		t.Fatalf("unexpected first metric: %+v", gotBody[0])
+	}
+	if gotBody[0].Value == nil || *gotBody[0].Value != 123.45 {
+		t.Fatalf("expected gauge value 123.45, got %+v", gotBody[0].Value)
+	}
+	if gotBody[0].Delta != nil {
+		t.Fatalf("expected gauge delta nil, got %+v", gotBody[0].Delta)
+	}
+
+	if gotBody[1].ID != "PollCount" || gotBody[1].MType != "counter" {
+		t.Fatalf("unexpected second metric: %+v", gotBody[1])
+	}
+	if gotBody[1].Delta == nil || *gotBody[1].Delta != 7 {
+		t.Fatalf("expected counter delta 7, got %+v", gotBody[1].Delta)
+	}
+	if gotBody[1].Value != nil {
+		t.Fatalf("expected counter value nil, got %+v", gotBody[1].Value)
+	}
+}
+
+func TestMetricSender_SendBatch_EmptyBatchDoesNotSendRequest(t *testing.T) {
+	// Arrange
+	called := false
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	sender := NewMetricSender(ts.URL, ts.Client())
+
+	// Act
+	err := sender.SendBatch(nil)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if called {
+		t.Fatal("expected server not to be called")
+	}
+}
+
+func TestMetricSender_SendBatch_Non200Status(t *testing.T) {
+	// Arrange
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer ts.Close()
+
+	sender := NewMetricSender(ts.URL, ts.Client())
+
+	// Act
+	err := sender.SendBatch([]dto.MetricDTO{
+		{Type: "gauge", Name: "Alloc", Value: "1.23"},
+	})
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestMetricSender_SendBatch_InvalidMetricValue(t *testing.T) {
+	// Arrange
+	called := false
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	sender := NewMetricSender(ts.URL, ts.Client())
+
+	// Act
+	err := sender.SendBatch([]dto.MetricDTO{
+		{Type: "counter", Name: "PollCount", Value: "not-int"},
+	})
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if called {
+		t.Fatal("expected server not to be called")
+	}
+}

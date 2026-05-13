@@ -14,7 +14,15 @@ type ValueMetricUseCase interface {
 	Execute(cmd usecase.ValueMetricCommand) (string, error)
 }
 
-func (h *Handler) Value(w http.ResponseWriter, r *http.Request) {
+type ValueHandler struct {
+	getValueMetric ValueMetricUseCase
+}
+
+func NewValueHandler(getValueMetric ValueMetricUseCase) *ValueHandler {
+	return &ValueHandler{getValueMetric: getValueMetric}
+}
+
+func (h *ValueHandler) Value(w http.ResponseWriter, r *http.Request) {
 	typeMetric := chi.URLParam(r, "type")
 	name := chi.URLParam(r, "name")
 

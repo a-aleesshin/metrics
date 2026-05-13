@@ -25,3 +25,9 @@ type healthService struct{}
 func (h healthService) Check(ctx context.Context) health.Report {
 	return health.Report{Status: ""}
 }
+
+type updatesUseCaseNoop struct{}
+
+func (updatesUseCaseNoop) Execute(ctx context.Context, command usecase.UpdatesMetricsCommand) error {
+	return nil
+}

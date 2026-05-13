@@ -5,13 +5,12 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"math"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/a-aleesshin/metrics/internal/agent/application/dto"
 	dto2 "github.com/a-aleesshin/metrics/internal/agent/infra/dto"
+	"github.com/a-aleesshin/metrics/internal/agent/infra/mapper"
 )
 
 type MetricSender struct {
@@ -27,32 +26,10 @@ func NewMetricSender(url string, HTTPClient *http.Client) *MetricSender {
 }
 
 func (m *MetricSender) Send(dto dto.MetricDTO) error {
-	payload := dto2.MetricsSend{
-		ID:    dto.Name,
-		MType: dto.Type,
-	}
+	payload, err := mapper.ToSendMetric(dto)
 
-	switch dto.Type {
-	case "gauge":
-		v, err := strconv.ParseFloat(dto.Value, 64)
-
-		if err != nil {
-			return fmt.Errorf("invalid gauge value %q: %w", dto.Value, err)
-		}
-
-		if math.IsNaN(v) || math.IsInf(v, 0) {
-			v = 0
-		}
-
-		payload.Value = &v
-	case "counter":
-		d, err := strconv.ParseInt(dto.Value, 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid metric value: %s: %w", dto.Value, err)
-		}
-		payload.Delta = &d
-	default:
-		return fmt.Errorf("unsupported metric type: %s", dto.Type)
+	if err != nil {
+		return err
 	}
 
 	body, err := json.Marshal(payload)
@@ -73,6 +50,65 @@ func (m *MetricSender) Send(dto dto.MetricDTO) error {
 	}
 
 	request, err := http.NewRequest(http.MethodPost, m.url+"/update", &gzBuf)
+
+	if err != nil {
+		return err
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Encoding", "gzip")
+	request.Header.Set("Accept-Encoding", "gzip")
+
+	response, err := m.client.Do(request)
+
+	if err != nil {
+		return err
+	}
+
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", response.StatusCode)
+	}
+
+	return nil
+}
+
+func (m *MetricSender) SendBatch(metrics []dto.MetricDTO) error {
+	if len(metrics) == 0 {
+		return nil
+	}
+
+	payload := make([]dto2.MetricsSend, 0, len(metrics))
+
+	for _, metric := range metrics {
+		metricSendDTO, err := mapper.ToSendMetric(metric)
+
+		if err != nil {
+			return err
+		}
+
+		payload = append(payload, metricSendDTO)
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	var gzBuf bytes.Buffer
+	gz := gzip.NewWriter(&gzBuf)
+
+	if _, err := gz.Write(body); err != nil {
+		_ = gz.Close()
+		return err
+	}
+
+	if err := gz.Close(); err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest(http.MethodPost, m.url+"/updates", &gzBuf)
 
 	if err != nil {
 		return err

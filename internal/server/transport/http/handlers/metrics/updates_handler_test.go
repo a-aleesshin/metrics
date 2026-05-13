@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,7 +12,27 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func TestHandler_UpdateJSON(t *testing.T) {
+type updatesMetricsUseCaseSpy struct {
+	command usecase.UpdatesMetricsCommand
+	err     error
+	called  bool
+}
+
+func (s *updatesMetricsUseCaseSpy) Execute(ctx context.Context, command usecase.UpdatesMetricsCommand) error {
+	s.called = true
+	s.command = command
+
+	if s.err != nil {
+		return s.err
+	}
+
+	return nil
+}
+
+func TestUpdatesHandler_Updates(t *testing.T) {
+	gaugeValue := 123.45
+	counterDelta := int64(7)
+
 	tests := []struct {
 		name           string
 		body           string
@@ -19,97 +40,87 @@ func TestHandler_UpdateJSON(t *testing.T) {
 		useCaseErr     error
 		wantStatusCode int
 		wantCalled     bool
-		wantCommand    usecase.UpdateMetricCommand
+		wantCommand    usecase.UpdatesMetricsCommand
 	}{
 		{
-			name:           "success gauge",
-			body:           `{"id":"Alloc","type":"gauge","value":123.45}`,
+			name:           "success batch",
+			body:           `[{"id":"Alloc","type":"gauge","value":123.45},{"id":"PollCount","type":"counter","delta":7}]`,
 			contentType:    "application/json",
 			wantStatusCode: http.StatusOK,
 			wantCalled:     true,
-			wantCommand: usecase.UpdateMetricCommand{
-				Type:  "gauge",
-				Name:  "Alloc",
-				Value: "123.45",
+			wantCommand: usecase.UpdatesMetricsCommand{
+				Metrics: []usecase.MetricUpdatesCommand{
+					{Name: "Alloc", MType: "gauge", Value: &gaugeValue},
+					{Name: "PollCount", MType: "counter", Delta: &counterDelta},
+				},
 			},
 		},
 		{
-			name:           "success counter",
-			body:           `{"id":"PollCount","type":"counter","delta":7}`,
+			name:           "empty batch",
+			body:           `[]`,
 			contentType:    "application/json",
 			wantStatusCode: http.StatusOK,
-			wantCalled:     true,
-			wantCommand: usecase.UpdateMetricCommand{
-				Type:  "counter",
-				Name:  "PollCount",
-				Value: "7",
-			},
+			wantCalled:     false,
 		},
 		{
 			name:           "invalid content type",
-			body:           `{"id":"Alloc","type":"gauge","value":1}`,
+			body:           `[{"id":"Alloc","type":"gauge","value":1}]`,
 			contentType:    "text/plain",
 			wantStatusCode: http.StatusBadRequest,
 			wantCalled:     false,
 		},
 		{
 			name:           "invalid json",
-			body:           `{"id":"Alloc","type":"gauge","value":invalid}`,
+			body:           `[{"id":"Alloc","type":"gauge","value":invalid}]`,
+			contentType:    "application/json",
+			wantStatusCode: http.StatusBadRequest,
+			wantCalled:     false,
+		},
+		{
+			name:           "missing gauge value",
+			body:           `[{"id":"Alloc","type":"gauge"}]`,
 			contentType:    "application/json",
 			wantStatusCode: http.StatusBadRequest,
 			wantCalled:     false,
 		},
 		{
 			name:           "missing counter delta",
-			body:           `{"id":"PollCount","type":"counter"}`,
+			body:           `[{"id":"PollCount","type":"counter"}]`,
 			contentType:    "application/json",
 			wantStatusCode: http.StatusBadRequest,
 			wantCalled:     false,
 		},
 		{
 			name:           "unsupported metric type",
-			body:           `{"id":"Alloc","type":"unknown","value":123.45}`,
+			body:           `[{"id":"Alloc","type":"unknown","value":123.45}]`,
 			contentType:    "application/json",
 			wantStatusCode: http.StatusBadRequest,
 			wantCalled:     false,
 		},
 		{
-			name:           "usecase unsupported type maps 400",
-			body:           `{"id":"Alloc","type":"gauge","value":123.45}`,
-			contentType:    "application/json",
-			useCaseErr:     metric.ErrUnsupportedMetricType,
-			wantStatusCode: http.StatusBadRequest,
-			wantCalled:     true,
-			wantCommand: usecase.UpdateMetricCommand{
-				Type:  "gauge",
-				Name:  "Alloc",
-				Value: "123.45",
-			},
-		},
-		{
 			name:           "usecase invalid value maps 400",
-			body:           `{"id":"Alloc","type":"gauge","value":123.45}`,
+			body:           `[{"id":"Alloc","type":"gauge","value":123.45}]`,
 			contentType:    "application/json",
 			useCaseErr:     metric.ErrInvalidMetricValue,
 			wantStatusCode: http.StatusBadRequest,
 			wantCalled:     true,
-			wantCommand: usecase.UpdateMetricCommand{
-				Type:  "gauge",
-				Name:  "Alloc",
-				Value: "123.45",
+			wantCommand: usecase.UpdatesMetricsCommand{
+				Metrics: []usecase.MetricUpdatesCommand{
+					{Name: "Alloc", MType: "gauge", Value: &gaugeValue},
+				},
 			},
 		},
 		{
 			name:           "usecase unexpected error maps 500",
-			body:           `{"id":"Alloc","type":"gauge","value":123.45}`,
+			body:           `[{"id":"Alloc","type":"gauge","value":123.45}]`,
 			contentType:    "application/json",
 			useCaseErr:     http.ErrBodyNotAllowed,
 			wantStatusCode: http.StatusInternalServerError,
 			wantCalled:     true,
-			wantCommand: usecase.UpdateMetricCommand{
-				Type:  "gauge",
-				Name:  "Alloc",
-				Value: "123.45",
+			wantCommand: usecase.UpdatesMetricsCommand{
+				Metrics: []usecase.MetricUpdatesCommand{
+					{Name: "Alloc", MType: "gauge", Value: &gaugeValue},
+				},
 			},
 		},
 	}
@@ -117,14 +128,13 @@ func TestHandler_UpdateJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			useCaseSpy := &updateMetricUseCaseSpy{err: tt.useCaseErr}
-			handler := NewHandler(useCaseSpy, valueUseCaseNoop{}, listUseCaseNoop{}, healthService{})
+			useCaseSpy := &updatesMetricsUseCaseSpy{err: tt.useCaseErr}
+			handler := NewUpdatesHandler(useCaseSpy)
 
 			r := chi.NewRouter()
-			r.Post("/update", handler.UpdateJSON)
+			r.Post("/updates", handler.Updates)
 
-			req := httptest.NewRequest(http.MethodPost, "/update", strings.NewReader(tt.body))
-
+			req := httptest.NewRequest(http.MethodPost, "/updates", strings.NewReader(tt.body))
 			if tt.contentType != "" {
 				req.Header.Set("Content-Type", tt.contentType)
 			}
@@ -143,7 +153,7 @@ func TestHandler_UpdateJSON(t *testing.T) {
 				t.Fatalf("expected use case called=%v, got %v", tt.wantCalled, useCaseSpy.called)
 			}
 
-			if tt.wantCalled && useCaseSpy.command != tt.wantCommand {
+			if tt.wantCalled && !updatesCommandsEqual(useCaseSpy.command, tt.wantCommand) {
 				t.Fatalf("expected command %+v, got %+v", tt.wantCommand, useCaseSpy.command)
 			}
 
