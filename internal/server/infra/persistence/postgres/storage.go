@@ -64,7 +64,7 @@ func (p PostgresStorage) GetCounterByName(ctx context.Context, name metric.Name)
 
 	err := retry.Do(ctx, platformpostgres.IsRetriable, func() error {
 		return p.pool.QueryRow(
-			context.Background(),
+			ctx,
 			"SELECT id, name, counter_value FROM metric WHERE metric.name = $1 AND metric.type = $2",
 			name.String(),
 			metricTypeCounter,
@@ -122,7 +122,7 @@ func (p PostgresStorage) SaveCounter(ctx context.Context, counter *metric.Counte
 			INSERT INTO metric (id, name, type, gauge_value, counter_value) VALUES ($1, $2, $3, NULL, $4)
 			ON CONFLICT (name, type)
 			DO UPDATE SET
-				counter_value = metric.counter_value + EXCLUDED.counter_value,
+				counter_value = EXCLUDED.counter_value,
 				gauge_value = NULL,
 				updated_at = now()
 			`
@@ -140,7 +140,7 @@ func (p PostgresStorage) SaveCounter(ctx context.Context, counter *metric.Counte
 	})
 
 	if err != nil {
-		return fmt.Errorf("save gauge: %w", err)
+		return fmt.Errorf("save counter: %w", err)
 	}
 
 	return nil
