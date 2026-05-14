@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"sort"
 	"strconv"
 
@@ -18,14 +19,14 @@ func NewListMetricUseCase(repo repository.MetricQueryRepository) *ListMetricUseC
 	}
 }
 
-func (u *ListMetricUseCase) Execute() (dto.ListMetricsResult, error) {
-	gauges, err := u.repo.ListGauges()
+func (u *ListMetricUseCase) Execute(ctx context.Context) (dto.ListMetricsResult, error) {
+	gauges, err := u.repo.ListGauges(ctx)
 
 	if err != nil {
 		return dto.ListMetricsResult{}, err
 	}
 
-	counters, err := u.repo.ListCounters()
+	counters, err := u.repo.ListCounters(ctx)
 
 	if err != nil {
 		return dto.ListMetricsResult{}, err

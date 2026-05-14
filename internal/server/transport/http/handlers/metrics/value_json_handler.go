@@ -5,20 +5,29 @@ import (
 	"net/http"
 	"strconv"
 
+	platformhttp "github.com/a-aleesshin/metrics/internal/platform/http"
 	applicationerror "github.com/a-aleesshin/metrics/internal/server/application/error"
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
 )
 
-func (h *Handler) ValueJSON(w http.ResponseWriter, r *http.Request) {
-	if !h.IsJSON(r) {
+type ValueJsonHandler struct {
+	getValueMetric ValueMetricUseCase
+}
+
+func NewValueJsonHandler(usecase ValueMetricUseCase) *ValueJsonHandler {
+	return &ValueJsonHandler{getValueMetric: usecase}
+}
+
+func (h *ValueJsonHandler) ValueJSON(w http.ResponseWriter, r *http.Request) {
+	if !platformhttp.IsJSON(r) {
 		http.Error(w, "invalid content type", http.StatusBadRequest)
 		return
 	}
 
 	var req Metrics
 
-	if err := h.DecodeJSON(r, &req); err != nil {
+	if err := platformhttp.DecodeJSON(r, &req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -28,7 +37,7 @@ func (h *Handler) ValueJSON(w http.ResponseWriter, r *http.Request) {
 		Name: req.ID,
 	}
 
-	result, err := h.getValueMetric.Execute(command)
+	result, err := h.getValueMetric.Execute(r.Context(), command)
 
 	if err != nil {
 		switch {
@@ -67,5 +76,5 @@ func (h *Handler) ValueJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.WriteJSON(w, http.StatusOK, resp)
+	platformhttp.WriteJSON(w, http.StatusOK, resp)
 }

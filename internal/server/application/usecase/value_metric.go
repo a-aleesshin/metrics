@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"strconv"
 
 	applicationerror "github.com/a-aleesshin/metrics/internal/server/application/error"
@@ -21,12 +22,12 @@ func NewGetValueMetricUseCase(repo repository.MetricQueryRepository) *GetValueMe
 	return &GetValueMetricUseCase{repo: repo}
 }
 
-func (u *GetValueMetricUseCase) Execute(cmd ValueMetricCommand) (string, error) {
+func (u *GetValueMetricUseCase) Execute(ctx context.Context, cmd ValueMetricCommand) (string, error) {
 	metricName := metric.Name(cmd.Name)
 
 	switch cmd.Type {
 	case "gauge":
-		data, found, err := u.repo.FindGaugeByName(metricName)
+		data, found, err := u.repo.FindGaugeByName(ctx, metricName)
 
 		if err != nil {
 			return "", err
@@ -38,7 +39,7 @@ func (u *GetValueMetricUseCase) Execute(cmd ValueMetricCommand) (string, error) 
 
 		return strconv.FormatFloat(data, 'f', -1, 64), nil
 	case "counter":
-		data, found, err := u.repo.FindCounterByName(metricName)
+		data, found, err := u.repo.FindCounterByName(ctx, metricName)
 		if err != nil {
 			return "", err
 		}

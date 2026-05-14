@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"sync"
 
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
@@ -32,7 +33,7 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-func (m *MemStorage) GetGaugeByName(name metric.Name) (*metric.Gauge, error) {
+func (m *MemStorage) GetGaugeByName(ctx context.Context, name metric.Name) (*metric.Gauge, error) {
 	m.mu.Lock()
 	record, ok := m.gauges[string(name)]
 	defer m.mu.Unlock()
@@ -50,7 +51,7 @@ func (m *MemStorage) GetGaugeByName(name metric.Name) (*metric.Gauge, error) {
 	return gauge, nil
 }
 
-func (m *MemStorage) SaveGauge(gauge *metric.Gauge) error {
+func (m *MemStorage) SaveGauge(ctx context.Context, gauge *metric.Gauge) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -63,7 +64,7 @@ func (m *MemStorage) SaveGauge(gauge *metric.Gauge) error {
 	return nil
 }
 
-func (m *MemStorage) GetCounterByName(name metric.Name) (*metric.Counter, error) {
+func (m *MemStorage) GetCounterByName(ctx context.Context, name metric.Name) (*metric.Counter, error) {
 	m.mu.Lock()
 	record, ok := m.counter[string(name)]
 	defer m.mu.Unlock()
@@ -81,7 +82,7 @@ func (m *MemStorage) GetCounterByName(name metric.Name) (*metric.Counter, error)
 	return counter, nil
 }
 
-func (m *MemStorage) SaveCounter(counter *metric.Counter) error {
+func (m *MemStorage) SaveCounter(ctx context.Context, counter *metric.Counter) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -94,7 +95,7 @@ func (m *MemStorage) SaveCounter(counter *metric.Counter) error {
 	return nil
 }
 
-func (m *MemStorage) ListCounters() ([]repository.CounterSnapshot, error) {
+func (m *MemStorage) ListCounters(ctx context.Context) ([]repository.CounterSnapshot, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -110,7 +111,7 @@ func (m *MemStorage) ListCounters() ([]repository.CounterSnapshot, error) {
 	return out, nil
 }
 
-func (m *MemStorage) ListGauges() ([]repository.GaugeSnapshot, error) {
+func (m *MemStorage) ListGauges(ctx context.Context) ([]repository.GaugeSnapshot, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -126,7 +127,7 @@ func (m *MemStorage) ListGauges() ([]repository.GaugeSnapshot, error) {
 	return out, nil
 }
 
-func (m *MemStorage) FindGaugeByName(name metric.Name) (value float64, found bool, err error) {
+func (m *MemStorage) FindGaugeByName(ctx context.Context, name metric.Name) (value float64, found bool, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -138,7 +139,7 @@ func (m *MemStorage) FindGaugeByName(name metric.Name) (value float64, found boo
 	return rec.Value, true, nil
 }
 
-func (m *MemStorage) FindCounterByName(name metric.Name) (delta int64, found bool, err error) {
+func (m *MemStorage) FindCounterByName(ctx context.Context, name metric.Name) (delta int64, found bool, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -150,7 +151,7 @@ func (m *MemStorage) FindCounterByName(name metric.Name) (delta int64, found boo
 	return rec.Delta, true, nil
 }
 
-func (m *MemStorage) GetAllMetrics() (repository.MetricsState, error) {
+func (m *MemStorage) GetAllMetrics(ctx context.Context) (repository.MetricsState, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -180,4 +181,36 @@ func (m *MemStorage) GetAllMetrics() (repository.MetricsState, error) {
 	}
 
 	return state, nil
+}
+
+func (m *MemStorage) UpdateBatch(ctx context.Context, batch repository.MetricBatch) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, gauge := range batch.Gauges {
+		m.gauges[gauge.Name().String()] = gaugeRecord{
+			ID:    gauge.Id().String(),
+			Name:  gauge.Name().String(),
+			Value: gauge.Value(),
+		}
+	}
+
+	for _, counter := range batch.Counters {
+		name := counter.Name().String()
+
+		rec, ok := m.counter[name]
+		if !ok {
+			m.counter[name] = counterRecord{
+				ID:    counter.Id().String(),
+				Name:  name,
+				Delta: counter.Delta(),
+			}
+			continue
+		}
+
+		rec.Delta += counter.Delta()
+		m.counter[name] = rec
+	}
+
+	return nil
 }

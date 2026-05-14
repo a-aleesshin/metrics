@@ -4,136 +4,177 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/a-aleesshin/metrics/internal/platform/db/postgres"
+	"github.com/ilyakaznacheev/cleanenv"
+)
+
+type ValueSource string
+
+const (
+	StorageTypeFile     = "file"
+	StorageTypePostgres = "postgres"
+	StorageTypeMemory   = "memory"
+
+	ValueSourceDefault ValueSource = "default"
+	ValueSourceFlag    ValueSource = "flag"
+	ValueSourceEnv     ValueSource = "env"
 )
 
 type ServerConfig struct {
-	Address         string `env:"ADDRESS"`
+	Address         string
 	StoreInterval   time.Duration
 	FileStoragePath string
 	Restore         bool
 	Postgres        *postgres.Config
+	StorageType     string
 }
 
-var (
-	addressDefault         = "localhost:8080"
-	storeIntervalDefault   = 300
-	fileStoragePathDefault = "./metrics-db.json"
-	restoreDefault         = true
-	databaseDsnDefault     = "postgres://user:password@host:5432/dbname?sslmode=disable"
-)
+type rawServerConfig struct {
+	Address         string `env:"ADDRESS"`
+	StoreInterval   int    `env:"STORE_INTERVAL"`
+	FileStoragePath string `env:"FILE_STORAGE_PATH"`
+	Restore         bool   `env:"RESTORE"`
+	Postgres        string `env:"DATABASE_DSN"`
+	StorageType     string `env:"STORAGE_TYPE"`
+}
+
+type rawServerConfigSource struct {
+	Address         ValueSource
+	StoreInterval   ValueSource
+	FileStoragePath ValueSource
+	Restore         ValueSource
+	Postgres        ValueSource
+}
+
+func defaultRawServerConfig() (*rawServerConfig, *rawServerConfigSource) {
+	return &rawServerConfig{
+			Address:         "localhost:8080",
+			StoreInterval:   300,
+			FileStoragePath: "./metrics-db.json",
+			Restore:         true,
+			Postgres:        "",
+			StorageType:     "memory",
+		},
+		&rawServerConfigSource{
+			Address:         ValueSourceDefault,
+			StoreInterval:   ValueSourceDefault,
+			FileStoragePath: ValueSourceDefault,
+			Restore:         ValueSourceDefault,
+			Postgres:        ValueSourceDefault,
+		}
+}
 
 func LoadConfig(args []string) (*ServerConfig, error) {
-	var cfg ServerConfig
+	raw, source := defaultRawServerConfig()
+	err := parseServerFlags(raw, source, args)
 
-	fs := flag.NewFlagSet("server", flag.ContinueOnError)
-
-	var address string
-	var storeInterval int
-	var filePath string
-	var dataBaseDsn string
-	var restore bool
-
-	fs.StringVar(&address, "a", addressDefault, "HTTP server address")
-	fs.IntVar(&storeInterval, "i", storeIntervalDefault, "store interval in seconds")
-	fs.StringVar(&filePath, "f", fileStoragePathDefault, "file storage path")
-	fs.StringVar(&dataBaseDsn, "d", databaseDsnDefault, "database DSN")
-	fs.BoolVar(&restore, "r", restoreDefault, "restore metrics from file on startup")
-
-	if err := fs.Parse(args); err != nil {
+	if err != nil {
 		return nil, fmt.Errorf("failed to parse command line arguments: %w", err)
 	}
 
-	valueAddress, err := getStringValue(&address, "ADDRESS")
-	if err != nil {
-		return nil, err
-	}
-	cfg.Address = valueAddress
-
-	valueStoreInterval, err := getIntValueAllowZero(&storeInterval, "STORE_INTERVAL")
-	if err != nil {
-		return nil, err
-	}
-	cfg.StoreInterval = time.Duration(valueStoreInterval) * time.Second
-
-	valueFilePath, err := getStringValue(&filePath, "FILE_STORAGE_PATH")
-	if err != nil {
-		return nil, err
-	}
-	cfg.FileStoragePath = valueFilePath
-
-	valueRestore, err := getBoolValue(&restore, "RESTORE")
-	if err != nil {
-		return nil, err
-	}
-	cfg.Restore = valueRestore
-
-	valueDatabaseDsn, err := getStringValue(&dataBaseDsn, "DATABASE_DSN")
-	if err != nil {
-		return nil, err
+	if err := cleanenv.ReadEnv(raw); err != nil {
+		return nil, fmt.Errorf("read env config: %w", err)
 	}
 
-	postgresConfig, err := postgres.NewConfigFromString(valueDatabaseDsn)
+	markEnvSources(source)
+
+	cfg, err := buildServerConfig(raw, source)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create postgres config from DSN: %w", err)
+		return nil, fmt.Errorf("build server config: %w", err)
 	}
 
-	cfg.Postgres = postgresConfig
-
-	return &cfg, nil
+	return cfg, nil
 }
 
-func getStringValue(flagValue *string, envName string) (string, error) {
-	envValue := os.Getenv(envName)
-	if envValue != "" {
-		return envValue, nil
+func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, args []string) error {
+	fs := flag.NewFlagSet("server", flag.ContinueOnError)
+
+	fs.StringVar(&raw.Address, "a", raw.Address, "HTTP server address")
+	fs.IntVar(&raw.StoreInterval, "i", raw.StoreInterval, "store interval in seconds")
+	fs.StringVar(&raw.FileStoragePath, "f", raw.FileStoragePath, "file storage path")
+	fs.StringVar(&raw.Postgres, "d", raw.Postgres, "database DSN")
+	fs.BoolVar(&raw.Restore, "r", raw.Restore, "restore metrics from file on startup")
+
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("failed to parse command line arguments: %w", err)
 	}
 
-	if flagValue == nil || *flagValue == "" {
-		return "", fmt.Errorf("%s must be set", envName)
-	}
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "a":
+			rawSource.Address = ValueSourceFlag
+		case "i":
+			rawSource.StoreInterval = ValueSourceFlag
+		case "f":
+			rawSource.FileStoragePath = ValueSourceFlag
+		case "d":
+			rawSource.Postgres = ValueSourceFlag
+		case "r":
+			rawSource.Restore = ValueSourceFlag
+		}
+	})
 
-	return *flagValue, nil
+	return nil
 }
 
-func getIntValueAllowZero(flagValue *int, envName string) (int, error) {
-	envValue := os.Getenv(envName)
+func markEnvSources(sources *rawServerConfigSource) {
+	if _, ok := os.LookupEnv("ADDRESS"); ok {
+		sources.Address = ValueSourceEnv
+	}
 
-	if envValue != "" {
-		val, err := strconv.Atoi(envValue)
+	if _, ok := os.LookupEnv("STORE_INTERVAL"); ok {
+		sources.StoreInterval = ValueSourceEnv
+	}
+
+	if value, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok && value != "" {
+		sources.FileStoragePath = ValueSourceEnv
+	}
+
+	if _, ok := os.LookupEnv("RESTORE"); ok {
+		sources.Restore = ValueSourceEnv
+	}
+
+	if value, ok := os.LookupEnv("DATABASE_DSN"); ok && value != "" {
+		sources.Postgres = ValueSourceEnv
+	}
+}
+
+func buildServerConfig(raw *rawServerConfig, source *rawServerConfigSource) (*ServerConfig, error) {
+	if raw.StoreInterval < 0 {
+		return nil, fmt.Errorf("store interval must be >= 0")
+	}
+
+	var postgresConfig *postgres.Config
+	var typeStorage = StorageTypeMemory
+
+	hasPostgres := raw.Postgres != "" && source.Postgres != ValueSourceDefault
+	hasFile := raw.FileStoragePath != "" && source.FileStoragePath != ValueSourceDefault
+
+	switch {
+	case hasPostgres:
+		var err error
+		postgresConfig, err = postgres.NewConfigFromString(raw.Postgres)
+
 		if err != nil {
-			return 0, fmt.Errorf("invalid value for environment variable %s: %w", envName, err)
+			return nil, fmt.Errorf("failed to create postgres config from DSN: %w", err)
 		}
-		if val < 0 {
-			return 0, fmt.Errorf("%s must be >= 0", envName)
-		}
-		return val, nil
+
+		typeStorage = StorageTypePostgres
+	case hasFile:
+		typeStorage = StorageTypeFile
+	default:
+		typeStorage = StorageTypeMemory
 	}
 
-	if flagValue == nil || *flagValue < 0 {
-		return 0, fmt.Errorf("%s must be >= 0", envName)
-	}
-
-	return *flagValue, nil
-}
-
-func getBoolValue(flagValue *bool, envName string) (bool, error) {
-	envValue := os.Getenv(envName)
-	if envValue != "" {
-		val, err := strconv.ParseBool(envValue)
-		if err != nil {
-			return false, fmt.Errorf("invalid value for environment variable %s: %w", envName, err)
-		}
-		return val, nil
-	}
-
-	if flagValue == nil {
-		return false, fmt.Errorf("%s must be set", envName)
-	}
-
-	return *flagValue, nil
+	return &ServerConfig{
+		Address:         raw.Address,
+		StoreInterval:   time.Duration(raw.StoreInterval) * time.Second,
+		FileStoragePath: raw.FileStoragePath,
+		Restore:         raw.Restore,
+		Postgres:        postgresConfig,
+		StorageType:     typeStorage,
+	}, nil
 }

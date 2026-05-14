@@ -1,5 +1,7 @@
 package repository
 
+import "context"
+
 type MetricSnapshot struct {
 	ID    string   `json:"id"`
 	Type  string   `json:"type"`
@@ -8,6 +10,6 @@ type MetricSnapshot struct {
 }
 
 type MetricSnapshotStore interface {
-	Save(metrics []MetricSnapshot) error
-	Load() ([]MetricSnapshot, error)
+	Save(ctx context.Context, metrics []MetricSnapshot) error
+	Load(ctx context.Context) ([]MetricSnapshot, error)
 }

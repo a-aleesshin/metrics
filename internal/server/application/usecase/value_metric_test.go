@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -18,22 +19,22 @@ type metricQueryRepoStub struct {
 	counterErr   error
 }
 
-func (s *metricQueryRepoStub) ListGauges() ([]repository.GaugeSnapshot, error) {
+func (s *metricQueryRepoStub) ListGauges(ctx context.Context) ([]repository.GaugeSnapshot, error) {
 	return nil, nil
 }
 
-func (s *metricQueryRepoStub) ListCounters() ([]repository.CounterSnapshot, error) {
+func (s *metricQueryRepoStub) ListCounters(ctx context.Context) ([]repository.CounterSnapshot, error) {
 	return nil, nil
 }
 
-func (s *metricQueryRepoStub) FindGaugeByName(name metric.Name) (float64, bool, error) {
+func (s *metricQueryRepoStub) FindGaugeByName(ctx context.Context, name metric.Name) (float64, bool, error) {
 	if s.gaugeErr != nil {
 		return 0, false, s.gaugeErr
 	}
 	return s.gaugeValue, s.gaugeFound, nil
 }
 
-func (s *metricQueryRepoStub) FindCounterByName(name metric.Name) (int64, bool, error) {
+func (s *metricQueryRepoStub) FindCounterByName(ctx context.Context, name metric.Name) (int64, bool, error) {
 	if s.counterErr != nil {
 		return 0, false, s.counterErr
 	}
@@ -104,7 +105,7 @@ func TestGetValueMetricUseCase_Execute(t *testing.T) {
 			uc := NewGetValueMetricUseCase(tt.repo)
 
 			// Act
-			got, err := uc.Execute(tt.cmd)
+			got, err := uc.Execute(context.Background(), tt.cmd)
 
 			// Assert
 			if tt.wantErr != nil {

@@ -11,79 +11,101 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/a-aleesshin/metrics/internal/platform/db/postgres"
+	platformpostgres "github.com/a-aleesshin/metrics/internal/platform/db/postgres"
 	"github.com/a-aleesshin/metrics/internal/platform/health"
 	sharedrouter "github.com/a-aleesshin/metrics/internal/platform/http"
+	"github.com/a-aleesshin/metrics/internal/platform/id"
 	"github.com/a-aleesshin/metrics/internal/platform/logger"
 	"github.com/a-aleesshin/metrics/internal/server/application/mapper"
+	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
 	snapshotfile "github.com/a-aleesshin/metrics/internal/server/infra/persistence/file"
 	"github.com/a-aleesshin/metrics/internal/server/infra/persistence/memory"
+	storagepostgres "github.com/a-aleesshin/metrics/internal/server/infra/persistence/postgres"
 	"github.com/a-aleesshin/metrics/internal/server/transport/cli"
-	"github.com/a-aleesshin/metrics/internal/server/transport/http/metrics"
+	"github.com/a-aleesshin/metrics/internal/server/transport/http/handlers/healths"
+	"github.com/a-aleesshin/metrics/internal/server/transport/http/handlers/metrics"
 	"github.com/a-aleesshin/metrics/internal/server/transport/http/middleware"
 	"go.uber.org/zap"
 )
 
+type storageRuntime struct {
+	metricRepo    repository.MetricRepository
+	queryRepo     repository.MetricQueryRepository
+	healthService *health.Service
+	snapshotSaver usecase.SnapshotSaver
+	periodicSaver usecase.SnapshotSaver
+	batchRepo     repository.MetricBatchRepository
+	cleanup       func()
+}
+
+type appLoggerRuntime struct {
+	logger    *zap.Logger
+	appLogger *logger.ZapLogger
+	cleanup   func()
+}
+
+// TODO прокинуть контекст до инфры
 func run(cfg *cli.ServerConfig) error {
-	ctx := context.Background()
-	baseZap, err := zap.NewProduction()
+	startupCtx := context.Background()
 
+	loggers, err := buildLoggers()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+	defer loggers.cleanup()
 
-	defer func() { _ = baseZap.Sync() }()
-
-	storage := memory.NewMemStorage()
-
-	snapshotStore, err := snapshotfile.NewSnapshotStore(cfg.FileStoragePath)
-
+	runtime, err := buildStorageRuntime(startupCtx, cfg)
 	if err != nil {
-		return fmt.Errorf("create snapshot store: %w", err)
+		return err
 	}
+	defer runtime.cleanup()
 
-	appLogger := logger.NewZapLogger(baseZap)
-	snapshotMapper := mapper.NewMetricSnapshotMapper()
+	updateMetricsUC := usecase.NewUpdateMetric(
+		runtime.metricRepo,
+		loggers.appLogger,
+		runtime.snapshotSaver,
+	)
+	getValueMetricUC := usecase.NewGetValueMetricUseCase(runtime.queryRepo)
+	listMetricsUC := usecase.NewListMetricUseCase(runtime.queryRepo)
 
-	saveSnapshotUC := usecase.NewSaveMetricSnapshotUseCase(storage, snapshotStore, snapshotMapper)
-	restoreUC := usecase.NewRestoreMetricUseCase(storage, snapshotStore, snapshotMapper)
+	// TODO спорный случай, на данный момент uuid сущности не нужен, но я пока его оставлю
+	idGenerator := id.NewUUIDV7Generator()
 
-	if cfg.Restore {
-		if err := restoreUC.Execute(); err != nil {
-			return fmt.Errorf("restore metrics: %w", err)
-		}
-	}
+	updatesMetricsUC := usecase.NewUpdatesMetricsUseCase(
+		runtime.batchRepo,
+		idGenerator,
+	)
 
-	var saver usecase.SnapshotSaver
-	if cfg.StoreInterval == 0 {
-		saver = saveSnapshotUC
-	}
+	updateHandler := metrics.NewUpdateHandler(updateMetricsUC)
+	updateJSONHandler := metrics.NewUpdateJsonHandler(updateMetricsUC)
+	updatesHandler := metrics.NewUpdatesHandler(updatesMetricsUC)
 
-	postgresPool, err := postgres.NewPool(ctx, cfg.Postgres)
+	valueHandler := metrics.NewValueHandler(getValueMetricUC)
+	valueJSONHandler := metrics.NewValueJsonHandler(getValueMetricUC)
 
-	if err != nil {
-		return fmt.Errorf("create postgres pool: %w", err)
-	}
+	listHandler := metrics.NewListMetricsHandler(listMetricsUC)
 
-	defer postgresPool.Close()
+	metricsHandler := metrics.NewHandler(
+		updateHandler,
+		updateJSONHandler,
+		updatesHandler,
+		valueHandler,
+		valueJSONHandler,
+		listHandler,
+	)
 
-	postgresChecker := postgres.NewHealthChecker(postgresPool)
-	healthService := health.NewService(postgresChecker)
-
-	updateMetricsUC := usecase.NewUpdateMetric(storage, appLogger, saver)
-	getValueMetricUC := usecase.NewGetValueMetricUseCase(storage)
-	listMetricsUC := usecase.NewListMetricUseCase(storage)
-
-	metricsHandler := metrics.NewHandler(updateMetricsUC, getValueMetricUC, listMetricsUC, healthService)
+	pingHandler := healths.NewPingHandler(runtime.healthService)
+	healthHandler := healths.NewHandler(pingHandler)
 
 	router := sharedrouter.New(
 		[]func(http.Handler) http.Handler{
 			middleware.DecompressRequest,
 			middleware.CompressResponse,
-			middleware.RequestLogger(baseZap),
+			middleware.RequestLogger(loggers.logger),
 		},
 		metricsHandler,
+		healthHandler,
 	)
 
 	server := &http.Server{
@@ -91,28 +113,39 @@ func run(cfg *cli.ServerConfig) error {
 		Handler: router,
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	serverCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if cfg.StoreInterval > 0 {
-		go func() {
-			ticker := time.NewTicker(cfg.StoreInterval)
-			defer ticker.Stop()
+	startPeriodicSnapshot(serverCtx, cfg.StoreInterval, runtime.periodicSaver)
 
-			for {
-				select {
-				case <-ticker.C:
-					if err := saveSnapshotUC.Execute(); err != nil {
-						log.Printf("periodic snapshot save failed: %v", err)
-					}
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
+	return serve(serverCtx, server, runtime.periodicSaver)
+}
+
+func startPeriodicSnapshot(ctx context.Context, interval time.Duration, saver usecase.SnapshotSaver) {
+	if saver == nil || interval <= 0 {
+		return
 	}
 
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := saver.Execute(ctx); err != nil {
+					log.Printf("periodic snapshot save failed: %v", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+func serve(ctx context.Context, server *http.Server, finalSaver usecase.SnapshotSaver) error {
 	errCh := make(chan error, 1)
+
 	go func() {
 		errCh <- server.ListenAndServe()
 	}()
@@ -132,8 +165,10 @@ func run(cfg *cli.ServerConfig) error {
 			return fmt.Errorf("shutdown server: %w", err)
 		}
 
-		if err := saveSnapshotUC.Execute(); err != nil {
-			return fmt.Errorf("final snapshot save: %w", err)
+		if finalSaver != nil {
+			if err := finalSaver.Execute(shutdownCtx); err != nil {
+				return fmt.Errorf("final snapshot save: %w", err)
+			}
 		}
 
 		err := <-errCh
@@ -143,4 +178,127 @@ func run(cfg *cli.ServerConfig) error {
 	}
 
 	return nil
+}
+
+func buildLoggers() (*appLoggerRuntime, error) {
+	baseZap, err := zap.NewProduction()
+
+	if err != nil {
+		return nil, err
+	}
+
+	appLogger := logger.NewZapLogger(baseZap)
+
+	return &appLoggerRuntime{
+		logger:    baseZap,
+		appLogger: appLogger,
+		cleanup:   func() { _ = baseZap.Sync() },
+	}, nil
+}
+
+func buildStorageRuntime(ctx context.Context, cfg *cli.ServerConfig) (*storageRuntime, error) {
+	switch cfg.StorageType {
+	case cli.StorageTypeMemory:
+		return buildMemoryStorageRuntime(), nil
+	case cli.StorageTypeFile:
+		return buildFileStorageRuntime(ctx, cfg)
+	case cli.StorageTypePostgres:
+		return buildPostgresStorageRuntime(ctx, cfg)
+	default:
+		return nil, fmt.Errorf("unsupported storage type: %s", cfg.StorageType)
+	}
+}
+
+func buildPostgresStorageRuntime(ctx context.Context, cfg *cli.ServerConfig) (*storageRuntime, error) {
+	if cfg.Postgres == nil {
+		return nil, fmt.Errorf("postgres config is required")
+	}
+
+	postgresPool, err := platformpostgres.NewPool(ctx, cfg.Postgres)
+
+	if err != nil {
+		return nil, fmt.Errorf("create postgres pool: %w", err)
+	}
+
+	if err := platformpostgres.Migrate(cfg.Postgres.ConnectionStringDsn(), "migrations"); err != nil {
+		postgresPool.Close()
+		return nil, fmt.Errorf("migrate postgres: %w", err)
+	}
+
+	metricRepo := storagepostgres.NewPostgresStorage(postgresPool)
+	queryRepo := storagepostgres.NewQueryPostgresStorage(postgresPool)
+	postgresChecker := platformpostgres.NewHealthChecker(postgresPool)
+	batchRepo := storagepostgres.NewBatchRepository(postgresPool)
+
+	return &storageRuntime{
+		metricRepo:    metricRepo,
+		queryRepo:     queryRepo,
+		healthService: health.NewService(postgresChecker),
+		snapshotSaver: nil,
+		periodicSaver: nil,
+		batchRepo:     batchRepo,
+		cleanup:       postgresPool.Close,
+	}, nil
+}
+
+func buildFileStorageRuntime(ctx context.Context, cfg *cli.ServerConfig) (*storageRuntime, error) {
+	storage := memory.NewMemStorage()
+
+	snapshotStore, err := snapshotfile.NewSnapshotStore(cfg.FileStoragePath)
+	if err != nil {
+		return nil, fmt.Errorf("create snapshot store: %w", err)
+	}
+
+	snapshotMapper := mapper.NewMetricSnapshotMapper()
+
+	saveSnapshotUC := usecase.NewSaveMetricSnapshotUseCase(
+		storage,
+		snapshotStore,
+		snapshotMapper,
+	)
+
+	restoreUC := usecase.NewRestoreMetricUseCase(
+		storage,
+		snapshotStore,
+		snapshotMapper,
+	)
+
+	if cfg.Restore {
+		if err := restoreUC.Execute(ctx); err != nil {
+			return nil, fmt.Errorf("restore metrics: %w", err)
+		}
+	}
+
+	var snapshotSaver usecase.SnapshotSaver
+	var periodicSaver usecase.SnapshotSaver
+
+	if cfg.StoreInterval == 0 {
+		snapshotSaver = saveSnapshotUC
+	} else {
+		periodicSaver = saveSnapshotUC
+	}
+
+	return &storageRuntime{
+		metricRepo:    storage,
+		queryRepo:     storage,
+		healthService: health.NewService(),
+		snapshotSaver: snapshotSaver,
+		periodicSaver: periodicSaver,
+		batchRepo:     storage,
+		cleanup:       func() {},
+	}, nil
+}
+
+func buildMemoryStorageRuntime() *storageRuntime {
+	storage := memory.NewMemStorage()
+
+	return &storageRuntime{
+		metricRepo:    storage,
+		queryRepo:     storage,
+		healthService: health.NewService(),
+		snapshotSaver: nil,
+		periodicSaver: nil,
+		batchRepo:     storage,
+		cleanup:       func() {},
+	}
 }

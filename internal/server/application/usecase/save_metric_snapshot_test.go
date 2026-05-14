@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -15,7 +16,7 @@ type metricStateRepositoryStub struct {
 	err   error
 }
 
-func (s *metricStateRepositoryStub) GetAllMetrics() (repository.MetricsState, error) {
+func (s *metricStateRepositoryStub) GetAllMetrics(ctx context.Context) (repository.MetricsState, error) {
 	if s.err != nil {
 		return repository.MetricsState{}, s.err
 	}
@@ -28,7 +29,7 @@ type metricSnapshotStoreStubSaveUC struct {
 	loadErr error
 }
 
-func (s *metricSnapshotStoreStubSaveUC) Save(metrics []repository.MetricSnapshot) error {
+func (s *metricSnapshotStoreStubSaveUC) Save(ctx context.Context, metrics []repository.MetricSnapshot) error {
 	if s.saveErr != nil {
 		return s.saveErr
 	}
@@ -36,7 +37,7 @@ func (s *metricSnapshotStoreStubSaveUC) Save(metrics []repository.MetricSnapshot
 	return nil
 }
 
-func (s *metricSnapshotStoreStubSaveUC) Load() ([]repository.MetricSnapshot, error) {
+func (s *metricSnapshotStoreStubSaveUC) Load(ctx context.Context) ([]repository.MetricSnapshot, error) {
 	if s.loadErr != nil {
 		return nil, s.loadErr
 	}
@@ -145,7 +146,7 @@ func TestSaveMetricSnapshotUseCase_Execute(t *testing.T) {
 			uc := NewSaveMetricSnapshotUseCase(stateRepo, snapshotStore, snapshotMapper)
 
 			// Act
-			err := uc.Execute()
+			err := uc.Execute(context.Background())
 
 			// Assert
 			if tt.wantErr != "" {

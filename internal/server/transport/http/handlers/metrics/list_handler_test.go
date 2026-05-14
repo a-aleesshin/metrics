@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +18,7 @@ type listMetricsUseCaseSpy struct {
 	called bool
 }
 
-func (s *listMetricsUseCaseSpy) Execute() (dto.ListMetricsResult, error) {
+func (s *listMetricsUseCaseSpy) Execute(ctx context.Context) (dto.ListMetricsResult, error) {
 	s.called = true
 	if s.err != nil {
 		return dto.ListMetricsResult{}, s.err
@@ -62,7 +63,7 @@ func TestHandler_List(t *testing.T) {
 				result: tt.useCaseResult,
 				err:    tt.useCaseErr,
 			}
-			h := NewHandler(updateUseCaseNoop{}, valueUseCaseNoop{}, listSpy, healthService{})
+			h := NewListMetricsHandler(listSpy)
 
 			r := chi.NewRouter()
 			r.Get("/", h.List)

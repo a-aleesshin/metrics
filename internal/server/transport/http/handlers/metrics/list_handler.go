@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 
@@ -8,11 +9,20 @@ import (
 )
 
 type ListMetricsUseCase interface {
-	Execute() (dto.ListMetricsResult, error)
+	Execute(ctx context.Context) (dto.ListMetricsResult, error)
 }
 
-func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	result, err := h.listMetric.Execute()
+type ListMetricsHandler struct {
+	listMetric ListMetricsUseCase
+}
+
+func NewListMetricsHandler(listMetric ListMetricsUseCase) *ListMetricsHandler {
+	return &ListMetricsHandler{listMetric: listMetric}
+}
+
+func (h *ListMetricsHandler) List(w http.ResponseWriter, r *http.Request) {
+	result, err := h.listMetric.Execute(r.Context())
+
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

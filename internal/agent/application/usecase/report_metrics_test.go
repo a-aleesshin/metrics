@@ -11,16 +11,31 @@ import (
 )
 
 type metricSenderSpy struct {
-	sent []dto.MetricDTO
-	err  error
+	sent        []dto.MetricDTO
+	err         error
+	sendCalled  bool
+	batchCalled bool
 }
 
 func (s *metricSenderSpy) Send(metric dto.MetricDTO) error {
+	s.sendCalled = true
+
 	if s.err != nil {
 		return s.err
 	}
 
 	s.sent = append(s.sent, metric)
+	return nil
+}
+
+func (s *metricSenderSpy) SendBatch(metrics []dto.MetricDTO) error {
+	s.batchCalled = true
+
+	if s.err != nil {
+		return s.err
+	}
+
+	s.sent = append(s.sent, metrics...)
 	return nil
 }
 
@@ -55,11 +70,13 @@ func TestReportMetricsUseCase_Execute(t *testing.T) {
 	counterName, _ := metric.NewName("PollCount")
 
 	tests := []struct {
-		name        string
-		repository  *metricRepositoryStub
-		sender      *metricSenderSpy
-		wantErr     bool
-		wantMetrics []dto.MetricDTO
+		name            string
+		repository      *metricRepositoryStub
+		sender          *metricSenderSpy
+		wantErr         bool
+		wantMetrics     []dto.MetricDTO
+		wantSendCalled  bool
+		wantBatchCalled bool
 	}{
 		{
 			name: "send all metrics",
@@ -86,14 +103,16 @@ func TestReportMetricsUseCase_Execute(t *testing.T) {
 					Value: strconv.FormatInt(7, 10),
 				},
 			},
+			wantBatchCalled: true,
 		},
 		{
 			name: "repository error",
 			repository: &metricRepositoryStub{
 				err: errors.New("repository failed"),
 			},
-			sender:  &metricSenderSpy{},
-			wantErr: true,
+			sender:          &metricSenderSpy{},
+			wantErr:         true,
+			wantBatchCalled: false,
 		},
 		{
 			name: "sender error",
@@ -107,7 +126,17 @@ func TestReportMetricsUseCase_Execute(t *testing.T) {
 			sender: &metricSenderSpy{
 				err: errors.New("sender failed"),
 			},
-			wantErr: true,
+			wantErr:         true,
+			wantBatchCalled: true,
+		},
+		{
+			name: "empty metrics does not send batch",
+			repository: &metricRepositoryStub{
+				state: repository.MetricsState{},
+			},
+			sender:          &metricSenderSpy{},
+			wantMetrics:     nil,
+			wantBatchCalled: false,
 		},
 	}
 
@@ -129,6 +158,14 @@ func TestReportMetricsUseCase_Execute(t *testing.T) {
 
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.sender.sendCalled {
+				t.Fatal("expected Send not to be called")
+			}
+
+			if tt.sender.batchCalled != tt.wantBatchCalled {
+				t.Fatalf("expected SendBatch called %v, got %v", tt.wantBatchCalled, tt.sender.batchCalled)
 			}
 
 			gotMetrics := metricsToMap(tt.sender.sent)

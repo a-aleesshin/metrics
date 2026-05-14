@@ -5,11 +5,21 @@ import (
 	"net/http"
 	"strconv"
 
+	platformhttp "github.com/a-aleesshin/metrics/internal/platform/http"
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
+	"github.com/a-aleesshin/metrics/internal/server/transport/http/httperror"
 )
 
-func (h *Handler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
-	if !h.IsJSON(r) {
+type UpdateJsonHandler struct {
+	updateMetric UpdateMetricsUseCase
+}
+
+func NewUpdateJsonHandler(usecase UpdateMetricsUseCase) *UpdateJsonHandler {
+	return &UpdateJsonHandler{updateMetric: usecase}
+}
+
+func (h *UpdateJsonHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
+	if !platformhttp.IsJSON(r) {
 		http.Error(w, "invalid content type", http.StatusBadRequest)
 		return
 	}
@@ -50,10 +60,10 @@ func (h *Handler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 		Value: rawValue,
 	}
 
-	err := h.updateMetric.Execute(command)
+	err := h.updateMetric.Execute(r.Context(), command)
 
 	if err != nil {
-		h.writeError(w, err)
+		httperror.WriteError(w, err)
 		return
 	}
 

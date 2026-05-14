@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -18,15 +19,15 @@ type metricRepositoryStubREUC struct {
 	savedCounters []*metric.Counter
 }
 
-func (m *metricRepositoryStubREUC) GetGaugeByName(name metric.Name) (*metric.Gauge, error) {
+func (m *metricRepositoryStubREUC) GetGaugeByName(ctx context.Context, name metric.Name) (*metric.Gauge, error) {
 	return nil, nil
 }
 
-func (m *metricRepositoryStubREUC) GetCounterByName(name metric.Name) (*metric.Counter, error) {
+func (m *metricRepositoryStubREUC) GetCounterByName(ctx context.Context, name metric.Name) (*metric.Counter, error) {
 	return nil, nil
 }
 
-func (m *metricRepositoryStubREUC) SaveGauge(g *metric.Gauge) error {
+func (m *metricRepositoryStubREUC) SaveGauge(ctx context.Context, g *metric.Gauge) error {
 	if m.saveGaugeErr != nil {
 		return m.saveGaugeErr
 	}
@@ -34,7 +35,7 @@ func (m *metricRepositoryStubREUC) SaveGauge(g *metric.Gauge) error {
 	return nil
 }
 
-func (m *metricRepositoryStubREUC) SaveCounter(c *metric.Counter) error {
+func (m *metricRepositoryStubREUC) SaveCounter(ctx context.Context, c *metric.Counter) error {
 	if m.saveCounterErr != nil {
 		return m.saveCounterErr
 	}
@@ -47,11 +48,11 @@ type metricSnapshotStoreStub struct {
 	loadErr error
 }
 
-func (s *metricSnapshotStoreStub) Save(metrics []repository.MetricSnapshot) error {
+func (s *metricSnapshotStoreStub) Save(ctx context.Context, metrics []repository.MetricSnapshot) error {
 	return nil
 }
 
-func (s *metricSnapshotStoreStub) Load() ([]repository.MetricSnapshot, error) {
+func (s *metricSnapshotStoreStub) Load(ctx context.Context) ([]repository.MetricSnapshot, error) {
 	if s.loadErr != nil {
 		return nil, s.loadErr
 	}
@@ -162,7 +163,7 @@ func TestRestoreMetricUseCase_Execute(t *testing.T) {
 			uc := NewRestoreMetricUseCase(repo, store, snapshotMapper)
 
 			// Act
-			err := uc.Execute()
+			err := uc.Execute(context.Background())
 
 			if tt.wantErrContains != "" {
 				if err == nil {
