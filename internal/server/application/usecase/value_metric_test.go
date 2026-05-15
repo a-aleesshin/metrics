@@ -105,7 +105,7 @@ func TestGetValueMetricUseCase_Execute(t *testing.T) {
 			uc := NewGetValueMetricUseCase(tt.repo)
 
 			// Act
-			got, err := uc.Execute(context.Background(), tt.cmd)
+			got, err := uc.Execute(t.Context(), tt.cmd)
 
 			// Assert
 			if tt.wantErr != nil {

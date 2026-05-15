@@ -5,15 +5,19 @@ import (
 
 	"github.com/a-aleesshin/metrics/internal/agent/application/dto"
 	"github.com/a-aleesshin/metrics/internal/agent/application/port/repository"
-	"github.com/a-aleesshin/metrics/internal/agent/application/port/sender"
 )
+
+type MetricSender interface {
+	Send(dto dto.MetricDTO) error
+	SendBatch(metrics []dto.MetricDTO) error
+}
 
 type ReportMetricsUseCase struct {
 	repo   repository.MetricRepository
-	sender sender.MetricSender
+	sender MetricSender
 }
 
-func NewReportMetricsUseCase(repo repository.MetricRepository, sender sender.MetricSender) *ReportMetricsUseCase {
+func NewReportMetricsUseCase(repo repository.MetricRepository, sender MetricSender) *ReportMetricsUseCase {
 	return &ReportMetricsUseCase{repo: repo, sender: sender}
 }
 

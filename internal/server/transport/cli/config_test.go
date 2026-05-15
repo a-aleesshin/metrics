@@ -4,8 +4,6 @@ import (
 	"os"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
 )
 
 func resetEnv(t *testing.T) {
@@ -18,17 +16,10 @@ func resetEnv(t *testing.T) {
 		"RESTORE",
 		"DATABASE_DSN",
 	} {
-		old, ok := os.LookupEnv(key)
-
-		require.NoError(t, os.Unsetenv(key))
-
-		t.Cleanup(func() {
-			if ok {
-				require.NoError(t, os.Setenv(key, old))
-			} else {
-				require.NoError(t, os.Unsetenv(key))
-			}
-		})
+		t.Setenv(key, "")
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatalf("unset env %s: %v", key, err)
+		}
 	}
 }
 
@@ -76,7 +67,7 @@ func TestLoadConfig(t *testing.T) {
 			wantInterval:    42 * time.Second,
 			wantFilePath:    "/tmp/from-env.json",
 			wantRestore:     true,
-			wantDatabaseDsn: "host=localhost port=5432 user=postgres password=postgres dbname=postgres sslmode=disable",
+			wantDatabaseDsn: "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
 		},
 		{
 			name:    "unknown flag",

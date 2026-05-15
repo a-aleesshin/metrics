@@ -1,7 +1,6 @@
 package file
 
 import (
-	"context"
 	"testing"
 
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
@@ -54,7 +53,7 @@ func TestSnapshotStore_SaveLoad(t *testing.T) {
 			}
 
 			// Act
-			err = store.Save(context.Background(), tt.input)
+			err = store.Save(t.Context(), tt.input)
 
 			// Assert
 			if tt.wantErr {
@@ -68,7 +67,7 @@ func TestSnapshotStore_SaveLoad(t *testing.T) {
 				t.Fatalf("save failed: %v", err)
 			}
 
-			got, err := store.Load(context.Background())
+			got, err := store.Load(t.Context())
 
 			if err != nil {
 				t.Fatalf("load failed: %v", err)
@@ -91,7 +90,7 @@ func TestSnapshotStore_Load_FileNotExists_ReturnsEmpty(t *testing.T) {
 	}
 
 	// Act
-	got, err := store.Load(context.Background())
+	got, err := store.Load(t.Context())
 
 	// Assert
 	if err != nil {

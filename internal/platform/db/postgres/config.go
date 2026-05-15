@@ -2,7 +2,9 @@ package postgres
 
 import (
 	"fmt"
+	"net"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -94,9 +96,16 @@ func NewConfigFromString(dsn string) (*Config, error) {
 }
 
 func (c *Config) ConnectionString() string {
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode)
-}
+	dsn := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(c.User, c.Password),
+		Host:   net.JoinHostPort(c.Host, strconv.Itoa(int(c.Port))),
+		Path:   c.DBName,
+	}
 
-func (c *Config) ConnectionStringDsn() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s", c.User, c.Password, c.Host, c.Port, c.DBName, c.SSLMode)
+	query := dsn.Query()
+	query.Set("sslmode", c.SSLMode)
+	dsn.RawQuery = query.Encode()
+
+	return dsn.String()
 }

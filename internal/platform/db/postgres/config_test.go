@@ -18,7 +18,7 @@ func TestConfig_ConnectionString(t *testing.T) {
 		DBName:   "postgres",
 		SSLMode:  "disable",
 	}
-	want := "host=localhost port=5432 user=postgres password=postgres dbname=postgres sslmode=disable"
+	want := "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
 
 	// Act
 	connectionString := cfg.ConnectionString()

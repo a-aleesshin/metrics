@@ -11,15 +11,18 @@ import (
 	"github.com/a-aleesshin/metrics/internal/agent/application/dto"
 	dto2 "github.com/a-aleesshin/metrics/internal/agent/infra/dto"
 	"github.com/a-aleesshin/metrics/internal/agent/infra/mapper"
-	"github.com/a-aleesshin/metrics/internal/platform/retry"
 )
+
+type HTTPClient interface {
+	Do(request *http.Request) (*http.Response, error)
+}
 
 type MetricSender struct {
 	url    string
-	client *http.Client
+	client HTTPClient
 }
 
-func NewMetricSender(url string, HTTPClient *http.Client) *MetricSender {
+func NewMetricSender(url string, HTTPClient HTTPClient) *MetricSender {
 	return &MetricSender{
 		url:    normalizeBaseURL(url),
 		client: HTTPClient,
@@ -88,30 +91,29 @@ func (m *MetricSender) sendGzippedJSON(path string, body []byte) error {
 
 	gzBody := gzBuf.Bytes()
 
-	return retry.Do(context.Background(), isRetriableHTTPError, func() error {
-		request, err := http.NewRequest(
-			http.MethodPost,
-			m.url+path,
-			bytes.NewReader(gzBody),
-		)
-		if err != nil {
-			return err
-		}
+	request, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
+		m.url+path,
+		bytes.NewReader(gzBody),
+	)
+	if err != nil {
+		return err
+	}
 
-		request.Header.Set("Content-Type", "application/json")
-		request.Header.Set("Content-Encoding", "gzip")
-		request.Header.Set("Accept-Encoding", "gzip")
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Encoding", "gzip")
+	request.Header.Set("Accept-Encoding", "gzip")
 
-		response, err := m.client.Do(request)
-		if err != nil {
-			return err
-		}
-		defer response.Body.Close()
+	response, err := m.client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
 
-		if response.StatusCode != http.StatusOK {
-			return unexpectedStatusError{code: response.StatusCode}
-		}
+	if response.StatusCode != http.StatusOK {
+		return unexpectedStatusError{code: response.StatusCode}
+	}
 
-		return nil
-	})
+	return nil
 }

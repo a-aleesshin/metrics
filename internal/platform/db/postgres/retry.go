@@ -17,5 +17,13 @@ func IsRetriable(err error) bool {
 		return false
 	}
 
-	return pgerrcode.IsConnectionException(pgErr.Code)
+	switch pgErr.Code {
+	case pgerrcode.SerializationFailure,
+		pgerrcode.DeadlockDetected,
+		pgerrcode.AdminShutdown,
+		pgerrcode.TooManyConnections:
+		return true
+	default:
+		return pgerrcode.IsConnectionException(pgErr.Code)
+	}
 }

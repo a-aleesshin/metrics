@@ -35,6 +35,26 @@ func TestIsRetriable(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "serialization failure",
+			err:  &pgconn.PgError{Code: pgerrcode.SerializationFailure},
+			want: true,
+		},
+		{
+			name: "deadlock detected",
+			err:  &pgconn.PgError{Code: pgerrcode.DeadlockDetected},
+			want: true,
+		},
+		{
+			name: "admin shutdown",
+			err:  &pgconn.PgError{Code: pgerrcode.AdminShutdown},
+			want: true,
+		},
+		{
+			name: "too many connections",
+			err:  &pgconn.PgError{Code: pgerrcode.TooManyConnections},
+			want: true,
+		},
+		{
 			name: "unique violation is not retriable",
 			err:  &pgconn.PgError{Code: pgerrcode.UniqueViolation},
 			want: false,

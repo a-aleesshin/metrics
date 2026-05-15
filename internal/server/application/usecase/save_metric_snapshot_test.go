@@ -146,7 +146,7 @@ func TestSaveMetricSnapshotUseCase_Execute(t *testing.T) {
 			uc := NewSaveMetricSnapshotUseCase(stateRepo, snapshotStore, snapshotMapper)
 
 			// Act
-			err := uc.Execute(context.Background())
+			err := uc.Execute(t.Context())
 
 			// Assert
 			if tt.wantErr != "" {
