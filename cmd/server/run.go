@@ -15,7 +15,7 @@ import (
 	"github.com/a-aleesshin/metrics/internal/platform/health"
 	sharedrouter "github.com/a-aleesshin/metrics/internal/platform/http"
 	"github.com/a-aleesshin/metrics/internal/platform/id"
-	"github.com/a-aleesshin/metrics/internal/platform/logger"
+	platformlogger "github.com/a-aleesshin/metrics/internal/platform/logger"
 	"github.com/a-aleesshin/metrics/internal/server/application/mapper"
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
@@ -26,6 +26,7 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/transport/http/handlers/healths"
 	"github.com/a-aleesshin/metrics/internal/server/transport/http/handlers/metrics"
 	"github.com/a-aleesshin/metrics/internal/server/transport/http/middleware"
+	sharedlogger "github.com/a-aleesshin/metrics/internal/shared/port/logger"
 	"go.uber.org/zap"
 )
 
@@ -40,9 +41,9 @@ type storageRuntime struct {
 }
 
 type appLoggerRuntime struct {
-	logger    *zap.Logger
-	appLogger *logger.ZapLogger
-	cleanup   func()
+	httpLogger *zap.Logger
+	appLogger  sharedlogger.Logger
+	cleanup    func()
 }
 
 // TODO прокинуть контекст до инфры
@@ -102,7 +103,7 @@ func run(cfg *cli.ServerConfig) error {
 		[]func(http.Handler) http.Handler{
 			middleware.DecompressRequest,
 			middleware.CompressResponse,
-			middleware.RequestLogger(loggers.logger),
+			middleware.RequestLogger(loggers.httpLogger),
 		},
 		metricsHandler,
 		healthHandler,
@@ -187,12 +188,13 @@ func buildLoggers() (*appLoggerRuntime, error) {
 		return nil, err
 	}
 
-	appLogger := logger.NewZapLogger(baseZap)
+	httpLogger := baseZap.With(zap.String("component", "http"))
+	appLogger := platformlogger.NewZapLogger(baseZap.With(zap.String("component", "application")))
 
 	return &appLoggerRuntime{
-		logger:    baseZap,
-		appLogger: appLogger,
-		cleanup:   func() { _ = baseZap.Sync() },
+		httpLogger: httpLogger,
+		appLogger:  appLogger,
+		cleanup:    func() { _ = baseZap.Sync() },
 	}, nil
 }
 
@@ -220,7 +222,7 @@ func buildPostgresStorageRuntime(ctx context.Context, cfg *cli.ServerConfig) (*s
 		return nil, fmt.Errorf("create postgres pool: %w", err)
 	}
 
-	if err := platformpostgres.Migrate(cfg.Postgres.ConnectionStringDsn(), "migrations"); err != nil {
+	if err := platformpostgres.Migrate(cfg.Postgres.ConnectionString(), "migrations"); err != nil {
 		postgresPool.Close()
 		return nil, fmt.Errorf("migrate postgres: %w", err)
 	}

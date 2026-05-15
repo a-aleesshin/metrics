@@ -163,7 +163,7 @@ func TestRestoreMetricUseCase_Execute(t *testing.T) {
 			uc := NewRestoreMetricUseCase(repo, store, snapshotMapper)
 
 			// Act
-			err := uc.Execute(context.Background())
+			err := uc.Execute(t.Context())
 
 			if tt.wantErrContains != "" {
 				if err == nil {

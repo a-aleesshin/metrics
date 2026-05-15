@@ -71,7 +71,7 @@ func TestUpdatesMetricsUseCase_Execute_UpdatesBatch(t *testing.T) {
 	}
 
 	// Act
-	err := uc.Execute(context.Background(), command)
+	err := uc.Execute(t.Context(), command)
 
 	// Assert
 	if err != nil {
@@ -120,7 +120,7 @@ func TestUpdatesMetricsUseCase_Execute_EmptyBatchDoesNotCallRepository(t *testin
 	uc := NewUpdatesMetricsUseCase(repo, idGen)
 
 	// Act
-	err := uc.Execute(context.Background(), UpdatesMetricsCommand{})
+	err := uc.Execute(t.Context(), UpdatesMetricsCommand{})
 
 	// Assert
 	if err != nil {
@@ -217,7 +217,7 @@ func TestUpdatesMetricsUseCase_Execute_ReturnsError(t *testing.T) {
 			uc := NewUpdatesMetricsUseCase(tt.repo, tt.idGen)
 
 			// Act
-			err := uc.Execute(context.Background(), tt.command)
+			err := uc.Execute(t.Context(), tt.command)
 
 			// Assert
 			if !errors.Is(err, tt.wantErr) {

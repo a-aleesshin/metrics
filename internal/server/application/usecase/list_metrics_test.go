@@ -92,7 +92,7 @@ func TestListMetrics_Execute(t *testing.T) {
 			uc := NewListMetricUseCase(test.repo)
 
 			// Act
-			items, err := uc.Execute(context.Background())
+			items, err := uc.Execute(t.Context())
 
 			// Assert
 			if test.wantErr {

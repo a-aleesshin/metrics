@@ -31,7 +31,8 @@ func main() {
 	randomValue := randomadapter.NewRandomValueAdapter()
 
 	serverUrl := flags.Address
-	sender := httpadapter.NewMetricSender(serverUrl, http.DefaultClient)
+	retryClient := httpadapter.NewRetryClient(http.DefaultClient)
+	sender := httpadapter.NewMetricSender(serverUrl, retryClient)
 
 	collectUsecase := usecase.NewCollectMetricsUseCase(rider, repository, randomValue)
 	reportUsecase := usecase.NewReportMetricsUseCase(repository, sender)
