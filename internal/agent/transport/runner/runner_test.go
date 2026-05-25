@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -36,13 +37,24 @@ func (s *reportSpy) Execute() error {
 }
 
 type loggerStub struct {
+	mu      sync.Mutex
 	errMsgs []string
 }
 
 func (l *loggerStub) Info(msg string, fields ...portlogger.Field) {}
 
 func (l *loggerStub) Error(msg string, fields ...portlogger.Field) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
 	l.errMsgs = append(l.errMsgs, msg)
+}
+
+func (l *loggerStub) ErrorCount() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return len(l.errMsgs)
 }
 
 func TestAgentRunner_Run_LogsErrorAndContinues(t *testing.T) {
@@ -59,7 +71,7 @@ func TestAgentRunner_Run_LogsErrorAndContinues(t *testing.T) {
 		logStub,
 	)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	done := make(chan error, 1)
@@ -82,7 +94,7 @@ func TestAgentRunner_Run_LogsErrorAndContinues(t *testing.T) {
 	default:
 	}
 
-	if len(logStub.errMsgs) == 0 {
+	if logStub.ErrorCount() == 0 {
 		t.Fatal("expected error log, got none")
 	}
 
@@ -112,7 +124,7 @@ func TestAgentRunner_Run_LogsReportErrorAndContinues(t *testing.T) {
 		logStub,
 	)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	done := make(chan error, 1)
@@ -136,7 +148,7 @@ func TestAgentRunner_Run_LogsReportErrorAndContinues(t *testing.T) {
 	default:
 	}
 
-	if len(logStub.errMsgs) == 0 {
+	if logStub.ErrorCount() == 0 {
 		t.Fatal("expected error log, got none")
 	}
 

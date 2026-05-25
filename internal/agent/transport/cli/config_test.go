@@ -10,6 +10,7 @@ func resetEnv(t *testing.T) {
 	t.Setenv("ADDRESS", "")
 	t.Setenv("REPORT_INTERVAL", "")
 	t.Setenv("POLL_INTERVAL", "")
+	t.Setenv("KEY", "")
 }
 
 func TestLoadConfig_LoadFlags(t *testing.T) {
@@ -19,6 +20,7 @@ func TestLoadConfig_LoadFlags(t *testing.T) {
 		wantAddress string
 		wantReport  time.Duration
 		wantPoll    time.Duration
+		wantKey     string
 		wantErr     bool
 	}{
 		{
@@ -30,10 +32,11 @@ func TestLoadConfig_LoadFlags(t *testing.T) {
 		},
 		{
 			name:        "new all flags",
-			args:        []string{"-a=127.0.0.1:9000", "-r=30", "-p=5"},
+			args:        []string{"-a=127.0.0.1:9000", "-r=30", "-p=5", "-k=secret"},
 			wantAddress: "127.0.0.1:9000",
 			wantReport:  30 * time.Second,
 			wantPoll:    5 * time.Second,
+			wantKey:     "secret",
 		},
 		{
 			name:    "unknown flag",
@@ -86,6 +89,10 @@ func TestLoadConfig_LoadFlags(t *testing.T) {
 			if cfg.PollInterval != tt.wantPoll {
 				t.Fatalf("expected poll interval %v, got %v", tt.wantPoll, cfg.PollInterval)
 			}
+
+			if cfg.KeySignature != tt.wantKey {
+				t.Fatalf("expected key signature %q, got %q", tt.wantKey, cfg.KeySignature)
+			}
 		})
 	}
 }
@@ -95,8 +102,9 @@ func TestLoadConfig_EnvOverridesFlags(t *testing.T) {
 	t.Setenv("ADDRESS", "env-host:9999")
 	t.Setenv("REPORT_INTERVAL", "15")
 	t.Setenv("POLL_INTERVAL", "7")
+	t.Setenv("KEY", "env-secret")
 
-	cfg, err := LoadConfig([]string{"-a=flag-host:8080", "-r=30", "-p=5"})
+	cfg, err := LoadConfig([]string{"-a=flag-host:8080", "-r=30", "-p=5", "-k=flag-secret"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -111,6 +119,10 @@ func TestLoadConfig_EnvOverridesFlags(t *testing.T) {
 
 	if cfg.PollInterval != 7*time.Second {
 		t.Fatalf("got poll interval %v, want %v", cfg.PollInterval, 7*time.Second)
+	}
+
+	if cfg.KeySignature != "env-secret" {
+		t.Fatalf("got key signature %q, want %q", cfg.KeySignature, "env-secret")
 	}
 }
 
