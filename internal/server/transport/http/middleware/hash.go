@@ -24,7 +24,7 @@ func WithHashSHA256(key string) func(http.Handler) http.Handler {
 			}
 			_ = r.Body.Close()
 
-			if got := r.Header.Get(HashSHA256Header); !hash.VerifySHA256(body, key, got) {
+			if got := r.Header.Get(HashSHA256Header); got != "" && !hash.VerifySHA256(body, key, got) {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}

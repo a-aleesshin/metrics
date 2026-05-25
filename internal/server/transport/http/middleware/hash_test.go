@@ -37,11 +37,12 @@ func TestWithHashSHA256(t *testing.T) {
 			wantResponseSig: true,
 		},
 		{
-			name:           "missing hash",
-			key:            "secret",
-			body:           []byte(`{"ok":true}`),
-			wantStatusCode: http.StatusBadRequest,
-			wantCalled:     false,
+			name:            "missing hash",
+			key:             "secret",
+			body:            []byte(`{"ok":true}`),
+			wantStatusCode:  http.StatusOK,
+			wantCalled:      true,
+			wantResponseSig: true,
 		},
 		{
 			name:           "invalid hash",
