@@ -32,7 +32,8 @@ func main() {
 
 	serverUrl := flags.Address
 	retryClient := httpadapter.NewRetryClient(http.DefaultClient)
-	sender := httpadapter.NewMetricSender(serverUrl, retryClient)
+	signingClient := httpadapter.NewSigningClient(retryClient, flags.KeySignature)
+	sender := httpadapter.NewMetricSender(serverUrl, signingClient)
 
 	collectUsecase := usecase.NewCollectMetricsUseCase(rider, repository, randomValue)
 	reportUsecase := usecase.NewReportMetricsUseCase(repository, sender)

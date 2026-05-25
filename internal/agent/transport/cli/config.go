@@ -12,12 +12,14 @@ type AgentConfig struct {
 	Address        string `env:"ADDRESS"`
 	ReportInterval time.Duration
 	PollInterval   time.Duration
+	KeySignature   string
 }
 
 var (
 	addressDefault        = "localhost:8080"
 	reportIntervalDefault = 10
 	pollIntervalDefault   = 2
+	keySignatureDefault   = ""
 )
 
 func LoadConfig(args []string) (*AgentConfig, error) {
@@ -26,12 +28,14 @@ func LoadConfig(args []string) (*AgentConfig, error) {
 	fs := flag.NewFlagSet("agent", flag.ContinueOnError)
 
 	var address string
+	var keySignature string
 	var reportInterval int
 	var pollInterval int
 
 	fs.StringVar(&address, "a", addressDefault, "HTTP server address")
 	fs.IntVar(&reportInterval, "r", reportIntervalDefault, "report interval in seconds")
 	fs.IntVar(&pollInterval, "p", pollIntervalDefault, "poll interval in seconds")
+	fs.StringVar(&keySignature, "k", keySignatureDefault, "key signature")
 
 	err := fs.Parse(args)
 
@@ -63,7 +67,22 @@ func LoadConfig(args []string) (*AgentConfig, error) {
 
 	config.PollInterval = time.Duration(valuePollInterval) * time.Second
 
+	config.KeySignature = getOptionalStringValue(&keySignature, "KEY")
+
 	return &config, nil
+}
+
+func getOptionalStringValue(flagValue *string, envName string) string {
+	envValue := os.Getenv(envName)
+	if envValue != "" {
+		return envValue
+	}
+
+	if flagValue == nil {
+		return ""
+	}
+
+	return *flagValue
 }
 
 func getStringValue(flagValue *string, envName string) (string, error) {

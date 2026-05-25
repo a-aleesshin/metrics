@@ -15,6 +15,7 @@ func resetEnv(t *testing.T) {
 		"FILE_STORAGE_PATH",
 		"RESTORE",
 		"DATABASE_DSN",
+		"KEY",
 	} {
 		t.Setenv(key, "")
 		if err := os.Unsetenv(key); err != nil {
@@ -34,6 +35,7 @@ func TestLoadConfig(t *testing.T) {
 		wantRestore     bool
 		wantErr         bool
 		wantDatabaseDsn string
+		wantKey         string
 	}{
 		{
 			name:         "defaults",
@@ -55,19 +57,21 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "env_overrides_flags",
-			args: []string{"-a=127.0.0.1:9090", "-i=10", "-f=/tmp/from-flag.json", "-r=false", "-d=postgres://postgres:postgres@localhost:54321/postgres?sslmode=disable"},
+			args: []string{"-a=127.0.0.1:9090", "-i=10", "-f=/tmp/from-flag.json", "-r=false", "-d=postgres://postgres:postgres@localhost:54321/postgres?sslmode=disable", "-k=flag-secret"},
 			env: map[string]string{
 				"ADDRESS":           "env-host:7777",
 				"STORE_INTERVAL":    "42",
 				"FILE_STORAGE_PATH": "/tmp/from-env.json",
 				"RESTORE":           "true",
 				"DATABASE_DSN":      "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
+				"KEY":               "env-secret",
 			},
 			wantAddress:     "env-host:7777",
 			wantInterval:    42 * time.Second,
 			wantFilePath:    "/tmp/from-env.json",
 			wantRestore:     true,
 			wantDatabaseDsn: "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
+			wantKey:         "env-secret",
 		},
 		{
 			name:    "unknown flag",
@@ -144,6 +148,9 @@ func TestLoadConfig(t *testing.T) {
 			}
 			if tt.wantDatabaseDsn != "" && cfg.Postgres.ConnectionString() != tt.wantDatabaseDsn {
 				t.Fatalf("expected restore %v, got %v", tt.wantDatabaseDsn, cfg.Postgres.ConnectionString())
+			}
+			if cfg.KeySignature != tt.wantKey {
+				t.Fatalf("expected key signature %q, got %q", tt.wantKey, cfg.KeySignature)
 			}
 		})
 	}
