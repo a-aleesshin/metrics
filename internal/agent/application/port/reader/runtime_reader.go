@@ -8,3 +8,7 @@ type RuntimeMetric struct {
 type RuntimeReader interface {
 	Read() []RuntimeMetric
 }
+
+type SystemReader interface {
+	Read() ([]RuntimeMetric, error)
+}

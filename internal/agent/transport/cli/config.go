@@ -13,6 +13,7 @@ type AgentConfig struct {
 	ReportInterval time.Duration
 	PollInterval   time.Duration
 	KeySignature   string
+	RateLimit      int
 }
 
 var (
@@ -20,6 +21,7 @@ var (
 	reportIntervalDefault = 10
 	pollIntervalDefault   = 2
 	keySignatureDefault   = ""
+	rateLimitDefault      = 1
 )
 
 func LoadConfig(args []string) (*AgentConfig, error) {
@@ -31,11 +33,13 @@ func LoadConfig(args []string) (*AgentConfig, error) {
 	var keySignature string
 	var reportInterval int
 	var pollInterval int
+	var rateLimit int
 
 	fs.StringVar(&address, "a", addressDefault, "HTTP server address")
 	fs.IntVar(&reportInterval, "r", reportIntervalDefault, "report interval in seconds")
 	fs.IntVar(&pollInterval, "p", pollIntervalDefault, "poll interval in seconds")
 	fs.StringVar(&keySignature, "k", keySignatureDefault, "key signature")
+	fs.IntVar(&rateLimit, "l", rateLimitDefault, "outgoing requests rate limit")
 
 	err := fs.Parse(args)
 
@@ -68,6 +72,14 @@ func LoadConfig(args []string) (*AgentConfig, error) {
 	config.PollInterval = time.Duration(valuePollInterval) * time.Second
 
 	config.KeySignature = getOptionalStringValue(&keySignature, "KEY")
+
+	valueRateLimit, err := getIntValue(&rateLimit, "RATE_LIMIT")
+
+	if err != nil {
+		return nil, err
+	}
+
+	config.RateLimit = valueRateLimit
 
 	return &config, nil
 }
