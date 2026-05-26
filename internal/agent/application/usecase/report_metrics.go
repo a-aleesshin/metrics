@@ -21,11 +21,11 @@ func NewReportMetricsUseCase(repo repository.MetricRepository, sender MetricSend
 	return &ReportMetricsUseCase{repo: repo, sender: sender}
 }
 
-func (usecase *ReportMetricsUseCase) Execute() error {
+func (usecase *ReportMetricsUseCase) BuildMetrics() ([]dto.MetricDTO, error) {
 	metrics, err := usecase.repo.GetMetrics()
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	batch := make([]dto.MetricDTO, 0, len(metrics.Gauges)+len(metrics.Counters))
@@ -50,11 +50,24 @@ func (usecase *ReportMetricsUseCase) Execute() error {
 		batch = append(batch, metricDTO)
 	}
 
+	return batch, nil
+}
+
+func (usecase *ReportMetricsUseCase) Execute() error {
+	batch, err := usecase.BuildMetrics()
+	if err != nil {
+		return err
+	}
+
+	return usecase.SendMetrics(batch)
+}
+
+func (usecase *ReportMetricsUseCase) SendMetrics(batch []dto.MetricDTO) error {
 	if len(batch) == 0 {
 		return nil
 	}
 
-	err = usecase.sender.SendBatch(batch)
+	err := usecase.sender.SendBatch(batch)
 
 	if err != nil {
 		return err

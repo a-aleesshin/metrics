@@ -13,6 +13,7 @@ import (
 	"github.com/a-aleesshin/metrics/internal/agent/infra/persistence/memory"
 	"github.com/a-aleesshin/metrics/internal/agent/infra/random"
 	"github.com/a-aleesshin/metrics/internal/agent/infra/runtime"
+	"github.com/a-aleesshin/metrics/internal/agent/infra/system"
 	"github.com/a-aleesshin/metrics/internal/agent/transport/cli"
 	"github.com/a-aleesshin/metrics/internal/agent/transport/runner"
 	"github.com/a-aleesshin/metrics/internal/platform/logger"
@@ -27,14 +28,17 @@ func main() {
 	}
 
 	rider := runtimeadapter.NewMetricRuntimeReader()
+	systemReader := systemadapter.NewGopsutilReader()
 	repository := memory.NewMemMetricRepository()
 	randomValue := randomadapter.NewRandomValueAdapter()
 
 	serverUrl := flags.Address
 	retryClient := httpadapter.NewRetryClient(http.DefaultClient)
-	sender := httpadapter.NewMetricSender(serverUrl, retryClient)
+	signingClient := httpadapter.NewSigningClient(retryClient, flags.KeySignature)
+	sender := httpadapter.NewMetricSender(serverUrl, signingClient)
 
 	collectUsecase := usecase.NewCollectMetricsUseCase(rider, repository, randomValue)
+	collectSystemUsecase := usecase.NewCollectSystemMetricsUseCase(systemReader, repository)
 	reportUsecase := usecase.NewReportMetricsUseCase(repository, sender)
 
 	baseZap, _ := zap.NewProduction()
@@ -42,9 +46,11 @@ func main() {
 
 	agentRunner := runner.NewAgentRunner(
 		collectUsecase,
+		collectSystemUsecase,
 		reportUsecase,
 		flags.PollInterval,
 		flags.ReportInterval,
+		flags.RateLimit,
 		appLogger,
 	)
 
