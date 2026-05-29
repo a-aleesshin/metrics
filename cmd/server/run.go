@@ -46,7 +46,6 @@ type appLoggerRuntime struct {
 	cleanup    func()
 }
 
-// TODO прокинуть контекст до инфры
 func run(cfg *cli.ServerConfig) error {
 	startupCtx := context.Background()
 
@@ -101,6 +100,7 @@ func run(cfg *cli.ServerConfig) error {
 
 	router := sharedrouter.New(
 		[]func(http.Handler) http.Handler{
+			middleware.WithHashSHA256(cfg.KeySignature),
 			middleware.DecompressRequest,
 			middleware.CompressResponse,
 			middleware.RequestLogger(loggers.httpLogger),

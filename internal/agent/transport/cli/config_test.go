@@ -10,6 +10,8 @@ func resetEnv(t *testing.T) {
 	t.Setenv("ADDRESS", "")
 	t.Setenv("REPORT_INTERVAL", "")
 	t.Setenv("POLL_INTERVAL", "")
+	t.Setenv("KEY", "")
+	t.Setenv("RATE_LIMIT", "")
 }
 
 func TestLoadConfig_LoadFlags(t *testing.T) {
@@ -19,6 +21,8 @@ func TestLoadConfig_LoadFlags(t *testing.T) {
 		wantAddress string
 		wantReport  time.Duration
 		wantPoll    time.Duration
+		wantKey     string
+		wantRate    int
 		wantErr     bool
 	}{
 		{
@@ -27,13 +31,16 @@ func TestLoadConfig_LoadFlags(t *testing.T) {
 			wantAddress: "localhost:8080",
 			wantReport:  10 * time.Second,
 			wantPoll:    2 * time.Second,
+			wantRate:    1,
 		},
 		{
 			name:        "new all flags",
-			args:        []string{"-a=127.0.0.1:9000", "-r=30", "-p=5"},
+			args:        []string{"-a=127.0.0.1:9000", "-r=30", "-p=5", "-k=secret", "-l=3"},
 			wantAddress: "127.0.0.1:9000",
 			wantReport:  30 * time.Second,
 			wantPoll:    5 * time.Second,
+			wantKey:     "secret",
+			wantRate:    3,
 		},
 		{
 			name:    "unknown flag",
@@ -53,6 +60,16 @@ func TestLoadConfig_LoadFlags(t *testing.T) {
 		{
 			name:    "invalid poll interval negative",
 			args:    []string{"-p=-1"},
+			wantErr: true,
+		},
+		{
+			name:    "invalid rate limit zero",
+			args:    []string{"-l=0"},
+			wantErr: true,
+		},
+		{
+			name:    "invalid rate limit negative",
+			args:    []string{"-l=-1"},
 			wantErr: true,
 		},
 	}
@@ -86,6 +103,14 @@ func TestLoadConfig_LoadFlags(t *testing.T) {
 			if cfg.PollInterval != tt.wantPoll {
 				t.Fatalf("expected poll interval %v, got %v", tt.wantPoll, cfg.PollInterval)
 			}
+
+			if cfg.KeySignature != tt.wantKey {
+				t.Fatalf("expected key signature %q, got %q", tt.wantKey, cfg.KeySignature)
+			}
+
+			if cfg.RateLimit != tt.wantRate {
+				t.Fatalf("expected rate limit %d, got %d", tt.wantRate, cfg.RateLimit)
+			}
 		})
 	}
 }
@@ -95,8 +120,10 @@ func TestLoadConfig_EnvOverridesFlags(t *testing.T) {
 	t.Setenv("ADDRESS", "env-host:9999")
 	t.Setenv("REPORT_INTERVAL", "15")
 	t.Setenv("POLL_INTERVAL", "7")
+	t.Setenv("KEY", "env-secret")
+	t.Setenv("RATE_LIMIT", "4")
 
-	cfg, err := LoadConfig([]string{"-a=flag-host:8080", "-r=30", "-p=5"})
+	cfg, err := LoadConfig([]string{"-a=flag-host:8080", "-r=30", "-p=5", "-k=flag-secret", "-l=2"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -111,6 +138,14 @@ func TestLoadConfig_EnvOverridesFlags(t *testing.T) {
 
 	if cfg.PollInterval != 7*time.Second {
 		t.Fatalf("got poll interval %v, want %v", cfg.PollInterval, 7*time.Second)
+	}
+
+	if cfg.KeySignature != "env-secret" {
+		t.Fatalf("got key signature %q, want %q", cfg.KeySignature, "env-secret")
+	}
+
+	if cfg.RateLimit != 4 {
+		t.Fatalf("got rate limit %d, want %d", cfg.RateLimit, 4)
 	}
 }
 
@@ -145,11 +180,41 @@ func TestLoadConfig_ReturnsErrorWhenPollIntervalEnvIsZero(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_ReturnsErrorWhenRateLimitEnvIsInvalid(t *testing.T) {
+	resetEnv(t)
+	t.Setenv("RATE_LIMIT", "abc")
+
+	_, err := LoadConfig([]string{"-l=2"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	want := `invalid value for environment variable RATE_LIMIT: strconv.Atoi: parsing "abc": invalid syntax`
+	if err.Error() != want {
+		t.Fatalf("got error %q, want %q", err.Error(), want)
+	}
+}
+
+func TestLoadConfig_ReturnsErrorWhenRateLimitEnvIsZero(t *testing.T) {
+	resetEnv(t)
+	t.Setenv("RATE_LIMIT", "0")
+
+	_, err := LoadConfig([]string{"-l=2"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	want := "RATE_LIMIT must be > 0"
+	if err.Error() != want {
+		t.Fatalf("got error %q, want %q", err.Error(), want)
+	}
+}
+
 func TestLoadConfig_UsesEnvAndFlagsTogether(t *testing.T) {
 	resetEnv(t)
 	t.Setenv("ADDRESS", "env-host:9999")
 
-	cfg, err := LoadConfig([]string{"-r=30", "-p=5"})
+	cfg, err := LoadConfig([]string{"-r=30", "-p=5", "-l=6"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -164,6 +229,10 @@ func TestLoadConfig_UsesEnvAndFlagsTogether(t *testing.T) {
 
 	if cfg.PollInterval != 5*time.Second {
 		t.Fatalf("got poll interval %v, want %v", cfg.PollInterval, 5*time.Second)
+	}
+
+	if cfg.RateLimit != 6 {
+		t.Fatalf("got rate limit %d, want %d", cfg.RateLimit, 6)
 	}
 }
 
