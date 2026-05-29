@@ -5,10 +5,15 @@ type RuntimeMetric struct {
 	Value float64
 }
 
+type SystemMetric struct {
+	Name  string
+	Value float64
+}
+
 type RuntimeReader interface {
 	Read() []RuntimeMetric
 }
 
 type SystemReader interface {
-	Read() ([]RuntimeMetric, error)
+	Read() ([]SystemMetric, error)
 }

@@ -10,11 +10,11 @@ import (
 )
 
 type systemReaderStub struct {
-	metrics []reader.RuntimeMetric
+	metrics []reader.SystemMetric
 	err     error
 }
 
-func (s *systemReaderStub) Read() ([]reader.RuntimeMetric, error) {
+func (s *systemReaderStub) Read() ([]reader.SystemMetric, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -34,7 +34,7 @@ func TestCollectSystemMetricsUseCase_Execute(t *testing.T) {
 		{
 			name: "stores system gauges",
 			systemReader: &systemReaderStub{
-				metrics: []reader.RuntimeMetric{
+				metrics: []reader.SystemMetric{
 					{Name: "TotalMemory", Value: 1024},
 					{Name: "FreeMemory", Value: 256},
 					{Name: "CPUutilization1", Value: 10.5},
@@ -52,7 +52,7 @@ func TestCollectSystemMetricsUseCase_Execute(t *testing.T) {
 		{
 			name: "normalizes invalid gauge values",
 			systemReader: &systemReaderStub{
-				metrics: []reader.RuntimeMetric{
+				metrics: []reader.SystemMetric{
 					{Name: "TotalMemory", Value: math.NaN()},
 					{Name: "FreeMemory", Value: math.Inf(1)},
 				},
@@ -74,7 +74,7 @@ func TestCollectSystemMetricsUseCase_Execute(t *testing.T) {
 		{
 			name: "returns invalid metric name error",
 			systemReader: &systemReaderStub{
-				metrics: []reader.RuntimeMetric{
+				metrics: []reader.SystemMetric{
 					{Name: "", Value: 1},
 				},
 			},
@@ -84,7 +84,7 @@ func TestCollectSystemMetricsUseCase_Execute(t *testing.T) {
 		{
 			name: "returns repository error",
 			systemReader: &systemReaderStub{
-				metrics: []reader.RuntimeMetric{
+				metrics: []reader.SystemMetric{
 					{Name: "TotalMemory", Value: 1024},
 				},
 			},
