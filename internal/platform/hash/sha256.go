@@ -1,16 +1,15 @@
 package hash
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
 )
 
 func SumSHA256(data []byte, key string) string {
-	h := sha256.New()
-
+	h := hmac.New(sha256.New, []byte(key))
 	_, _ = h.Write(data)
-	_, _ = h.Write([]byte(key))
 
 	return hex.EncodeToString(h.Sum(nil))
 }

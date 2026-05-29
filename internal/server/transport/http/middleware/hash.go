@@ -34,9 +34,9 @@ func WithHashSHA256(key string) func(http.Handler) http.Handler {
 			rec := newHashResponseRecorder(w)
 			next.ServeHTTP(rec, r)
 
-			for key, values := range rec.header {
+			for headerName, values := range rec.header {
 				for _, value := range values {
-					w.Header().Add(key, value)
+					w.Header().Add(headerName, value)
 				}
 			}
 

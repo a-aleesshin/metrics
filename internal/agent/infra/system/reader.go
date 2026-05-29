@@ -28,7 +28,7 @@ func newGopsutilReader(virtualMemory virtualMemoryReader, cpuPercent cpuPercentR
 	}
 }
 
-func (r *GopsutilReader) Read() ([]reader.RuntimeMetric, error) {
+func (r *GopsutilReader) Read() ([]reader.SystemMetric, error) {
 	memoryStats, err := r.virtualMemory()
 	if err != nil {
 		return nil, fmt.Errorf("read virtual memory: %w", err)
@@ -39,14 +39,14 @@ func (r *GopsutilReader) Read() ([]reader.RuntimeMetric, error) {
 		return nil, fmt.Errorf("read cpu percent: %w", err)
 	}
 
-	metrics := make([]reader.RuntimeMetric, 0, 2+len(cpuStats))
+	metrics := make([]reader.SystemMetric, 0, 2+len(cpuStats))
 	metrics = append(metrics,
-		reader.RuntimeMetric{Name: "TotalMemory", Value: float64(memoryStats.Total)},
-		reader.RuntimeMetric{Name: "FreeMemory", Value: float64(memoryStats.Free)},
+		reader.SystemMetric{Name: "TotalMemory", Value: float64(memoryStats.Total)},
+		reader.SystemMetric{Name: "FreeMemory", Value: float64(memoryStats.Free)},
 	)
 
 	for i, value := range cpuStats {
-		metrics = append(metrics, reader.RuntimeMetric{
+		metrics = append(metrics, reader.SystemMetric{
 			Name:  fmt.Sprintf("CPUutilization%d", i+1),
 			Value: value,
 		})
