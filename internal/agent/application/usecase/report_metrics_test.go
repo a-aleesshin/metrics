@@ -188,3 +188,94 @@ func TestReportMetricsUseCase_Execute(t *testing.T) {
 		})
 	}
 }
+
+func TestReportMetricsUseCase_BuildMetrics(t *testing.T) {
+	gaugeName, _ := metric.NewName("Alloc")
+	counterName, _ := metric.NewName("PollCount")
+
+	tests := []struct {
+		name        string
+		repository  *metricRepositoryStub
+		wantErr     bool
+		wantMetrics []dto.MetricDTO
+	}{
+		{
+			name: "builds all metrics",
+			repository: &metricRepositoryStub{
+				state: repository.MetricsState{
+					Gauges: []metric.Gauge{
+						*metric.NewGauge(gaugeName, 123.45),
+					},
+					Counters: []metric.Counter{
+						*metric.NewCounter(counterName, 7),
+					},
+				},
+			},
+			wantMetrics: []dto.MetricDTO{
+				{
+					Type:  "gauge",
+					Name:  "Alloc",
+					Value: strconv.FormatFloat(123.45, 'f', -1, 64),
+				},
+				{
+					Type:  "counter",
+					Name:  "PollCount",
+					Value: strconv.FormatInt(7, 10),
+				},
+			},
+		},
+		{
+			name: "returns empty slice for empty repository",
+			repository: &metricRepositoryStub{
+				state: repository.MetricsState{},
+			},
+			wantMetrics: []dto.MetricDTO{},
+		},
+		{
+			name: "returns repository error",
+			repository: &metricRepositoryStub{
+				err: errors.New("repository failed"),
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			uc := NewReportMetricsUseCase(tt.repository, &metricSenderSpy{})
+
+			// Act
+			gotMetrics, err := uc.BuildMetrics()
+
+			// Assert
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			got := metricsToMap(gotMetrics)
+			want := metricsToMap(tt.wantMetrics)
+
+			if len(got) != len(want) {
+				t.Fatalf("expected %d metrics, got %d", len(want), len(got))
+			}
+
+			for key, wantMetric := range want {
+				gotMetric, ok := got[key]
+				if !ok {
+					t.Fatalf("expected metric %q", key)
+				}
+				if gotMetric != wantMetric {
+					t.Fatalf("metric %q: got %+v, want %+v", key, gotMetric, wantMetric)
+				}
+			}
+		})
+	}
+}
