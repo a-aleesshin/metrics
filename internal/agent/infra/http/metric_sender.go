@@ -5,13 +5,25 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/a-aleesshin/metrics/internal/agent/application/dto"
 	dto2 "github.com/a-aleesshin/metrics/internal/agent/infra/dto"
 	"github.com/a-aleesshin/metrics/internal/agent/infra/mapper"
 )
+
+// gzip.Writer держит ~800 КБ внутренних буферов flate — создание на каждую
+// отправку было главным источником аллокаций по профилю, поэтому переиспользуем.
+var gzipWriterPool = sync.Pool{
+	New: func() any { return gzip.NewWriter(io.Discard) },
+}
+
+var gzipBufferPool = sync.Pool{
+	New: func() any { return new(bytes.Buffer) },
+}
 
 type HTTPClient interface {
 	Do(request *http.Request) (*http.Response, error)
@@ -77,17 +89,27 @@ func normalizeBaseURL(addr string) string {
 }
 
 func (m *MetricSender) sendGzippedJSON(path string, body []byte) error {
-	var gzBuf bytes.Buffer
-	gz := gzip.NewWriter(&gzBuf)
+	gzBuf := gzipBufferPool.Get().(*bytes.Buffer)
+	gzBuf.Reset()
+	// буфер нельзя вернуть в пул раньше: gzBody ссылается на него,
+	// пока client.Do (включая ретраи) не завершится
+	defer gzipBufferPool.Put(gzBuf)
+
+	gz := gzipWriterPool.Get().(*gzip.Writer)
+	gz.Reset(gzBuf)
 
 	if _, err := gz.Write(body); err != nil {
 		_ = gz.Close()
+		gzipWriterPool.Put(gz)
 		return err
 	}
 
 	if err := gz.Close(); err != nil {
+		gzipWriterPool.Put(gz)
 		return err
 	}
+
+	gzipWriterPool.Put(gz)
 
 	gzBody := gzBuf.Bytes()
 

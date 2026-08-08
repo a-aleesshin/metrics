@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 const (
@@ -13,6 +14,14 @@ const (
 	ctHTML  = "text/html"
 )
 
+var gzipWriterPool = sync.Pool{
+	New: func() any { return gzip.NewWriter(io.Discard) },
+}
+
+var gzipReaderPool = sync.Pool{
+	New: func() any { return new(gzip.Reader) },
+}
+
 func DecompressRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("Content-Encoding"), encGzip) {
@@ -20,14 +29,18 @@ func DecompressRequest(next http.Handler) http.Handler {
 			return
 		}
 
-		gz, err := gzip.NewReader(r.Body)
+		gz := gzipReaderPool.Get().(*gzip.Reader)
 
-		if err != nil {
+		if err := gz.Reset(r.Body); err != nil {
+			gzipReaderPool.Put(gz)
 			http.Error(w, "invalid gzip body", http.StatusBadRequest)
 			return
 		}
 
-		defer gz.Close()
+		defer func() {
+			_ = gz.Close()
+			gzipReaderPool.Put(gz)
+		}()
 		defer r.Body.Close()
 
 		r.Body = io.NopCloser(gz) // насколько понял стоит обярнуть, чтобы точно знать что мы записываем ReadCloser
@@ -80,11 +93,15 @@ func (cw *compressWriter) Write(b []byte) (int, error) {
 }
 
 func (cw *compressWriter) Close() error {
-	if cw.zr != nil {
-		return cw.zr.Close()
+	if cw.zr == nil {
+		return nil
 	}
 
-	return nil
+	err := cw.zr.Close()
+	gzipWriterPool.Put(cw.zr)
+	cw.zr = nil
+
+	return err
 }
 
 func (cw *compressWriter) decide() {
@@ -111,7 +128,10 @@ func (cw *compressWriter) decide() {
 		cw.useGzip = true
 		cw.Header().Set("Content-Encoding", encGzip)
 		cw.Header().Del("Content-Length")
-		cw.zr = gzip.NewWriter(cw.ResponseWriter)
+
+		zw := gzipWriterPool.Get().(*gzip.Writer)
+		zw.Reset(cw.ResponseWriter)
+		cw.zr = zw
 	}
 
 	cw.ResponseWriter.WriteHeader(cw.status)

@@ -12,6 +12,20 @@ type ListMetricsUseCase interface {
 	Execute(ctx context.Context) (dto.ListMetricsResult, error)
 }
 
+const listPage = `
+<!doctype html>
+<html>
+	<body>
+		<h1>Metrics</h1>
+
+		<ul>{{range .Items}}
+			<li>{{.Type}} {{.Name}} = {{.Value}}</li>{{end}}
+		</ul>
+	</body>
+</html>`
+
+var listPageTemplate = template.Must(template.New("metrics").Parse(listPage))
+
 type ListMetricsHandler struct {
 	listMetric ListMetricsUseCase
 }
@@ -28,21 +42,8 @@ func (h *ListMetricsHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	const page = `
-<!doctype html>
-<html>
-	<body>
-		<h1>Metrics</h1>
-
-		<ul>{{range .Items}}
-			<li>{{.Type}} {{.Name}} = {{.Value}}</li>{{end}}
-		</ul>
-	</body>
-</html>`
-
-	tpl := template.Must(template.New("metrics").Parse(page))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 
-	_ = tpl.Execute(w, result)
+	_ = listPageTemplate.Execute(w, result)
 }

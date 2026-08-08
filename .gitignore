@@ -30,3 +30,4 @@ vendor/
 # Docker
 .docker-data
 .docker-logs
+/profiles/
