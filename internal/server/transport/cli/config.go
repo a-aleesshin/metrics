@@ -29,6 +29,7 @@ type ServerConfig struct {
 	Restore         bool
 	Postgres        *postgres.Config
 	StorageType     string
+	KeySignature    string
 }
 
 type rawServerConfig struct {
@@ -38,6 +39,7 @@ type rawServerConfig struct {
 	Restore         bool   `env:"RESTORE"`
 	Postgres        string `env:"DATABASE_DSN"`
 	StorageType     string `env:"STORAGE_TYPE"`
+	KeySignature    string `env:"KEY"`
 }
 
 type rawServerConfigSource struct {
@@ -46,6 +48,7 @@ type rawServerConfigSource struct {
 	FileStoragePath ValueSource
 	Restore         ValueSource
 	Postgres        ValueSource
+	KeySignature    ValueSource
 }
 
 func defaultRawServerConfig() (*rawServerConfig, *rawServerConfigSource) {
@@ -56,6 +59,7 @@ func defaultRawServerConfig() (*rawServerConfig, *rawServerConfigSource) {
 			Restore:         true,
 			Postgres:        "",
 			StorageType:     "memory",
+			KeySignature:    "",
 		},
 		&rawServerConfigSource{
 			Address:         ValueSourceDefault,
@@ -63,6 +67,7 @@ func defaultRawServerConfig() (*rawServerConfig, *rawServerConfigSource) {
 			FileStoragePath: ValueSourceDefault,
 			Restore:         ValueSourceDefault,
 			Postgres:        ValueSourceDefault,
+			KeySignature:    ValueSourceDefault,
 		}
 }
 
@@ -97,6 +102,7 @@ func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, ar
 	fs.StringVar(&raw.FileStoragePath, "f", raw.FileStoragePath, "file storage path")
 	fs.StringVar(&raw.Postgres, "d", raw.Postgres, "database DSN")
 	fs.BoolVar(&raw.Restore, "r", raw.Restore, "restore metrics from file on startup")
+	fs.StringVar(&raw.KeySignature, "k", raw.KeySignature, "key signature")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("failed to parse command line arguments: %w", err)
@@ -114,6 +120,8 @@ func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, ar
 			rawSource.Postgres = ValueSourceFlag
 		case "r":
 			rawSource.Restore = ValueSourceFlag
+		case "k":
+			rawSource.KeySignature = ValueSourceFlag
 		}
 	})
 
@@ -139,6 +147,10 @@ func markEnvSources(sources *rawServerConfigSource) {
 
 	if value, ok := os.LookupEnv("DATABASE_DSN"); ok && value != "" {
 		sources.Postgres = ValueSourceEnv
+	}
+
+	if _, ok := os.LookupEnv("KEY"); ok {
+		sources.KeySignature = ValueSourceEnv
 	}
 }
 
@@ -176,5 +188,6 @@ func buildServerConfig(raw *rawServerConfig, source *rawServerConfigSource) (*Se
 		Restore:         raw.Restore,
 		Postgres:        postgresConfig,
 		StorageType:     typeStorage,
+		KeySignature:    raw.KeySignature,
 	}, nil
 }
