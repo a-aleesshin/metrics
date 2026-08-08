@@ -69,7 +69,7 @@ func (uc *UpdatesMetricsUseCase) Execute(ctx context.Context, command UpdatesMet
 			if metricItem.Delta == nil {
 				return metric.ErrInvalidMetricValue
 			}
-			
+
 			counter, err := metric.NewCounter(id.String(), name.String(), *metricItem.Delta)
 
 			if err != nil {
