@@ -11,9 +11,9 @@ import (
 )
 
 type httpClientStub struct {
-	responses []*http.Response
-	errors    []error
-	calls     int
+	statuses []int
+	errors   []error
+	calls    int
 }
 
 func (c *httpClientStub) Do(request *http.Request) (*http.Response, error) {
@@ -24,18 +24,15 @@ func (c *httpClientStub) Do(request *http.Request) (*http.Response, error) {
 		return nil, c.errors[index]
 	}
 
-	if index < len(c.responses) && c.responses[index] != nil {
-		return c.responses[index], nil
+	status := http.StatusOK
+	if index < len(c.statuses) && c.statuses[index] != 0 {
+		status = c.statuses[index]
 	}
 
-	return responseWithStatus(http.StatusOK), nil
-}
-
-func responseWithStatus(status int) *http.Response {
 	return &http.Response{
 		StatusCode: status,
 		Body:       io.NopCloser(strings.NewReader("")),
-	}
+	}, nil
 }
 
 func TestRetryClient_Do(t *testing.T) {
@@ -51,15 +48,15 @@ func TestRetryClient_Do(t *testing.T) {
 		{
 			name: "success first try",
 			client: &httpClientStub{
-				responses: []*http.Response{responseWithStatus(http.StatusOK)},
+				statuses: []int{http.StatusOK},
 			},
 			wantCalls: 1,
 		},
 		{
 			name: "success after retriable error",
 			client: &httpClientStub{
-				errors:    []error{temporaryErr, nil},
-				responses: []*http.Response{nil, responseWithStatus(http.StatusOK)},
+				errors:   []error{temporaryErr, nil},
+				statuses: []int{0, http.StatusOK},
 			},
 			wantCalls: 2,
 		},
@@ -93,6 +90,10 @@ func TestRetryClient_Do(t *testing.T) {
 
 			// Act
 			response, err := client.Do(request)
+
+			if response != nil {
+				defer response.Body.Close()
+			}
 
 			// Assert
 			if tt.wantErr != nil {
@@ -142,6 +143,10 @@ func TestRetryClient_Do_ContextCanceled(t *testing.T) {
 
 	// Act
 	response, err := client.Do(request)
+
+	if response != nil {
+		defer response.Body.Close()
+	}
 
 	// Assert
 	if !errors.Is(err, context.Canceled) {

@@ -34,36 +34,33 @@ func NewRetryClientWithDelays(client HTTPClient, delays []time.Duration) *RetryC
 	return retryClient
 }
 
-// Do выполняет запрос с повторами: тело клонируется через GetBody перед каждой попыткой.
+// Do выполняет запрос с повторами: тело клонируется через GetBody перед каждой
+// попыткой. Успешный ответ возвращается вызывающему — закрытие Body на нём.
 func (c *RetryClient) Do(request *http.Request) (*http.Response, error) {
-	var response *http.Response
+	delays := c.delays
+	if delays == nil {
+		delays = retry.DefaultDelays()
+	}
 
-	operation := func() error {
+	for attempt := 0; ; attempt++ {
 		retryRequest, err := cloneRequest(request)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		response, err = c.client.Do(retryRequest)
-		if err != nil {
-			return err
+		response, err := c.client.Do(retryRequest)
+		if err == nil {
+			return response, nil
 		}
 
-		return nil
-	}
+		if !isRetriableHTTPError(err) || attempt >= len(delays) {
+			return nil, err
+		}
 
-	var err error
-	if c.delays == nil {
-		err = retry.Do(request.Context(), isRetriableHTTPError, operation)
-	} else {
-		err = retry.DoWithDelays(request.Context(), c.delays, isRetriableHTTPError, operation)
+		if waitErr := retry.Wait(request.Context(), delays[attempt]); waitErr != nil {
+			return nil, waitErr
+		}
 	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
 }
 
 func cloneRequest(request *http.Request) (*http.Request, error) {

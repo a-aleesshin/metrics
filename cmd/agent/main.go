@@ -21,10 +21,17 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// run собирает зависимости агента и запускает его до сигнала завершения.
+func run() error {
 	flags, err := cli.LoadConfig(os.Args[1:])
 
 	if err != nil {
-		log.Fatal("config error: ", err)
+		return fmt.Errorf("config error: %w", err)
 	}
 
 	rider := runtimeadapter.NewMetricRuntimeReader()
@@ -32,16 +39,22 @@ func main() {
 	repository := memory.NewMemMetricRepository()
 	randomValue := randomadapter.NewRandomValueAdapter()
 
-	serverUrl := flags.Address
+	serverURL := flags.Address
 	retryClient := httpadapter.NewRetryClient(http.DefaultClient)
 	signingClient := httpadapter.NewSigningClient(retryClient, flags.KeySignature)
-	sender := httpadapter.NewMetricSender(serverUrl, signingClient)
+	sender := httpadapter.NewMetricSender(serverURL, signingClient)
 
 	collectUsecase := usecase.NewCollectMetricsUseCase(rider, repository, randomValue)
 	collectSystemUsecase := usecase.NewCollectSystemMetricsUseCase(systemReader, repository)
 	reportUsecase := usecase.NewReportMetricsUseCase(repository, sender)
 
-	baseZap, _ := zap.NewProduction()
+	baseZap, err := zap.NewProduction()
+
+	if err != nil {
+		return fmt.Errorf("create logger: %w", err)
+	}
+	defer func() { _ = baseZap.Sync() }()
+
 	appLogger := logger.NewZapLogger(baseZap)
 
 	agentRunner := runner.NewAgentRunner(
@@ -57,10 +70,5 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	err = agentRunner.Run(ctx)
-
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	return agentRunner.Run(ctx)
 }

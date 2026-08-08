@@ -68,12 +68,13 @@ func TestSigningClient_Do(t *testing.T) {
 			}
 
 			// Act
-			_, err = client.Do(request)
+			response, err := client.Do(request)
 
 			// Assert
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer response.Body.Close()
 
 			gotHeader := spy.request.Header.Get(HashSHA256Header)
 			if tt.wantHeader {
