@@ -11,14 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// BatchRepository — PostgreSQL-реализация батч-обновления метрик
+// в транзакции с ретраями.
 type BatchRepository struct {
 	pool *pgxpool.Pool
 }
 
+// NewBatchRepository создаёт батч-репозиторий на пуле соединений.
 func NewBatchRepository(pool *pgxpool.Pool) *BatchRepository {
 	return &BatchRepository{pool: pool}
 }
 
+// UpdateBatch применяет батч в одной транзакции: gauge перезаписываются,
+// counter накапливаются; пустой батч — no-op.
 func (b BatchRepository) UpdateBatch(ctx context.Context, batch repository.MetricBatch) error {
 	if len(batch.Gauges) == 0 && len(batch.Counters) == 0 {
 		return nil

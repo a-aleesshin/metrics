@@ -1,3 +1,4 @@
+// Package mapper преобразует доменные метрики в snapshot-представление и обратно.
 package mapper
 
 import (
@@ -8,18 +9,25 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
 )
 
+// Строковые типы метрик в snapshot-представлении.
 const (
-	TypeGauge   = "gauge"
+	// TypeGauge — метрика типа gauge (float64, перезапись).
+	TypeGauge = "gauge"
+	// TypeCounter — метрика типа counter (int64, накопление).
 	TypeCounter = "counter"
 )
 
+// MetricSnapshotMapper конвертирует метрики между доменной моделью и snapshot-структурой.
 type MetricSnapshotMapper struct {
 }
 
+// NewMetricSnapshotMapper создаёт маппер snapshot-ов метрик.
 func NewMetricSnapshotMapper() *MetricSnapshotMapper {
 	return &MetricSnapshotMapper{}
 }
 
+// SnapshotToDomain восстанавливает доменную метрику из snapshot;
+// заполнен ровно один из результатов — gauge или counter.
 func (m *MetricSnapshotMapper) SnapshotToDomain(snapshot repository.MetricSnapshot) (g *metric.Gauge, c *metric.Counter, err error) {
 	switch snapshot.Type {
 	case TypeGauge:
@@ -52,6 +60,7 @@ func (m *MetricSnapshotMapper) SnapshotToDomain(snapshot repository.MetricSnapsh
 	}
 }
 
+// GaugeToSnapshot конвертирует gauge в snapshot; nil-gauge — ошибка.
 func (m *MetricSnapshotMapper) GaugeToSnapshot(gauge *metric.Gauge) (repository.MetricSnapshot, error) {
 	if gauge == nil {
 		return repository.MetricSnapshot{}, errors.New("gauge is nil")
@@ -67,6 +76,7 @@ func (m *MetricSnapshotMapper) GaugeToSnapshot(gauge *metric.Gauge) (repository.
 	}, nil
 }
 
+// CounterToSnapshot конвертирует counter в snapshot; nil-counter — ошибка.
 func (m *MetricSnapshotMapper) CounterToSnapshot(counter *metric.Counter) (repository.MetricSnapshot, error) {
 	if counter == nil {
 		return repository.MetricSnapshot{}, errors.New("counter is nil")

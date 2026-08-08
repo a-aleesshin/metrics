@@ -11,18 +11,23 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// ValueMetricUseCase — usecase получения строкового значения метрики по типу и имени.
 type ValueMetricUseCase interface {
 	Execute(ctx context.Context, cmd usecase.ValueMetricCommand) (string, error)
 }
 
+// ValueHandler отдаёт значение метрики в виде текста по URL-параметрам.
 type ValueHandler struct {
 	getValueMetric ValueMetricUseCase
 }
 
+// NewValueHandler создаёт хендлер чтения значения метрики через URL-параметры.
 func NewValueHandler(getValueMetric ValueMetricUseCase) *ValueHandler {
 	return &ValueHandler{getValueMetric: getValueMetric}
 }
 
+// Value обрабатывает GET /value/{type}/{name}: возвращает значение метрики
+// как text/plain со статусом 200; 404 — метрика не найдена, 400 — неверный тип или имя.
 func (h *ValueHandler) Value(w http.ResponseWriter, r *http.Request) {
 	typeMetric := chi.URLParam(r, "type")
 	name := chi.URLParam(r, "name")

@@ -8,6 +8,7 @@ import (
 	"net/http"
 )
 
+// IsJSON сообщает, имеет ли запрос Content-Type application/json.
 func IsJSON(r *http.Request) bool {
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 
@@ -18,6 +19,8 @@ func IsJSON(r *http.Request) bool {
 	return true
 }
 
+// DecodeJSON декодирует тело запроса в dst; неизвестные поля
+// и несколько JSON-объектов подряд считаются ошибкой.
 func DecodeJSON(r *http.Request, dst any) error {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -34,6 +37,7 @@ func DecodeJSON(r *http.Request, dst any) error {
 	return nil
 }
 
+// WriteJSON пишет payload в ответ как JSON с указанным HTTP-статусом.
 func WriteJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

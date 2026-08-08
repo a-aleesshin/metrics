@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+// ClientIP определяет IP клиента: X-Real-IP, затем первый адрес X-Forwarded-For,
+// иначе хост из RemoteAddr.
 func ClientIP(r *http.Request) string {
 	if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
 		return ip

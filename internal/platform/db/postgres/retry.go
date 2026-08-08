@@ -7,6 +7,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// IsRetriable сообщает, стоит ли повторять операцию после ошибки PostgreSQL:
+// сбои сериализации, дедлоки, обрывы соединения и перегрузка по подключениям.
 func IsRetriable(err error) bool {
 	if err == nil {
 		return false

@@ -9,19 +9,24 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
 )
 
+// ValueMetricCommand — входные данные запроса значения метрики по типу и имени.
 type ValueMetricCommand struct {
 	Type string
 	Name string
 }
 
+// GetValueMetricUseCase — use case чтения текущего значения метрики.
 type GetValueMetricUseCase struct {
 	repo repository.MetricQueryRepository
 }
 
+// NewGetValueMetricUseCase создаёт use case чтения значения метрики.
 func NewGetValueMetricUseCase(repo repository.MetricQueryRepository) *GetValueMetricUseCase {
 	return &GetValueMetricUseCase{repo: repo}
 }
 
+// Execute возвращает значение метрики строкой; если метрика не найдена —
+// applicationerror.ErrMetricNotFound, для неизвестного типа — metric.ErrUnsupportedMetricType.
 func (u *GetValueMetricUseCase) Execute(ctx context.Context, cmd ValueMetricCommand) (string, error) {
 	metricName := metric.Name(cmd.Name)
 

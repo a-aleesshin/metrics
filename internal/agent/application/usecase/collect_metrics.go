@@ -1,3 +1,4 @@
+// Package usecase содержит сценарии агента: сбор runtime- и системных метрик и их отправку.
 package usecase
 
 import (
@@ -9,12 +10,14 @@ import (
 	"github.com/a-aleesshin/metrics/internal/agent/domain/metric"
 )
 
+// CollectMetricsUseCase собирает runtime-метрики, RandomValue и PollCount в репозиторий.
 type CollectMetricsUseCase struct {
 	runtimeRider reader.RuntimeReader
 	repository   repository.MetricRepository
 	randomValue  generator.RandomValueProvider
 }
 
+// NewCollectMetricsUseCase создаёт сценарий сбора runtime-метрик.
 func NewCollectMetricsUseCase(runtimeRider reader.RuntimeReader, repository repository.MetricRepository, randomValue generator.RandomValueProvider) *CollectMetricsUseCase {
 	return &CollectMetricsUseCase{
 		runtimeRider: runtimeRider,
@@ -23,6 +26,8 @@ func NewCollectMetricsUseCase(runtimeRider reader.RuntimeReader, repository repo
 	}
 }
 
+// Execute читает runtime-метрики и сохраняет их как gauge; NaN/Inf заменяются нулём,
+// PollCount увеличивается на 1.
 func (usecase *CollectMetricsUseCase) Execute() error {
 	metrics := usecase.runtimeRider.Read()
 

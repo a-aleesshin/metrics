@@ -1,3 +1,4 @@
+// Package retry выполняет операции с повторами и настраиваемыми задержками между попытками.
 package retry
 
 import (
@@ -11,12 +12,16 @@ var defaultDelays = []time.Duration{
 	5 * time.Second,
 }
 
+// IsRetriableFunc решает, стоит ли повторять операцию после данной ошибки.
 type IsRetriableFunc func(error) bool
 
+// Do выполняет operation с задержками по умолчанию (1s, 3s, 5s) между повторами.
 func Do(ctx context.Context, isRetriable IsRetriableFunc, operation func() error) error {
 	return DoWithDelays(ctx, defaultDelays, isRetriable, operation)
 }
 
+// DoWithDelays выполняет operation до len(delays)+1 раз, ожидая delays[i] перед i-м повтором.
+// Повторы прекращаются, если isRetriable вернул false или ctx отменён.
 func DoWithDelays(
 	ctx context.Context,
 	delays []time.Duration,

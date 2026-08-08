@@ -1,3 +1,4 @@
+// Package memory реализует потокобезопасное хранилище метрик агента в памяти.
 package memory
 
 import (
@@ -7,12 +8,14 @@ import (
 	"github.com/a-aleesshin/metrics/internal/agent/domain/metric"
 )
 
+// MemMetricRepository — in-memory реализация MetricRepository на map с RWMutex.
 type MemMetricRepository struct {
 	mu       sync.RWMutex
 	gauges   map[metric.Name]float64
 	counters map[metric.Name]int64
 }
 
+// NewMemMetricRepository создаёт пустое in-memory хранилище метрик.
 func NewMemMetricRepository() *MemMetricRepository {
 	return &MemMetricRepository{
 		gauges:   make(map[metric.Name]float64),
@@ -20,6 +23,7 @@ func NewMemMetricRepository() *MemMetricRepository {
 	}
 }
 
+// SetGauge сохраняет значение gauge, заменяя предыдущее.
 func (m *MemMetricRepository) SetGauge(gauge *metric.Gauge) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -28,6 +32,7 @@ func (m *MemMetricRepository) SetGauge(gauge *metric.Gauge) error {
 	return nil
 }
 
+// AddCounter прибавляет значение к накопленному счётчику.
 func (m *MemMetricRepository) AddCounter(counter *metric.Counter) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -36,6 +41,7 @@ func (m *MemMetricRepository) AddCounter(counter *metric.Counter) error {
 	return nil
 }
 
+// GetMetrics возвращает снимок всех сохранённых метрик.
 func (m *MemMetricRepository) GetMetrics() (repository.MetricsState, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

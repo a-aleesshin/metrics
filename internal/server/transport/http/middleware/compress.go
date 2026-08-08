@@ -1,3 +1,5 @@
+// Package middleware содержит HTTP-middleware сервера метрик: gzip-сжатие
+// запросов/ответов, проверку и простановку подписи HMAC-SHA256 и логирование запросов.
 package middleware
 
 import (
@@ -22,6 +24,8 @@ var gzipReaderPool = sync.Pool{
 	New: func() any { return new(gzip.Reader) },
 }
 
+// DecompressRequest — middleware, распаковывающее тело запроса с Content-Encoding: gzip;
+// при невалидном gzip отвечает 400. Остальные запросы проходят без изменений.
 func DecompressRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("Content-Encoding"), encGzip) {
@@ -137,6 +141,8 @@ func (cw *compressWriter) decide() {
 	cw.ResponseWriter.WriteHeader(cw.status)
 }
 
+// CompressResponse — middleware, сжимающее ответ gzip, если клиент прислал
+// Accept-Encoding: gzip, а Content-Type ответа — application/json или text/html.
 func CompressResponse(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ok := strings.Contains(r.Header.Get("Accept-Encoding"), encGzip)

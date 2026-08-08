@@ -1,3 +1,5 @@
+// Package cli загружает конфигурацию сервера метрик из флагов командной строки
+// и переменных окружения (env имеет приоритет над флагами, флаги — над значениями по умолчанию).
 package cli
 
 import (
@@ -10,8 +12,12 @@ import (
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
+// ValueSource обозначает источник значения параметра конфигурации: default, flag или env.
 type ValueSource string
 
+// StorageTypeFile, StorageTypePostgres и StorageTypeMemory — типы хранилища метрик
+// (ServerConfig.StorageType); ValueSourceDefault, ValueSourceFlag и ValueSourceEnv —
+// возможные источники значения параметра конфигурации.
 const (
 	StorageTypeFile     = "file"
 	StorageTypePostgres = "postgres"
@@ -22,6 +28,8 @@ const (
 	ValueSourceEnv     ValueSource = "env"
 )
 
+// ServerConfig — итоговая конфигурация сервера метрик: адрес, параметры хранилища,
+// ключ подписи HMAC-SHA256 и настройки аудита.
 type ServerConfig struct {
 	Address         string
 	StoreInterval   time.Duration
@@ -75,6 +83,8 @@ func defaultRawServerConfig() (*rawServerConfig, *rawServerConfigSource) {
 		}
 }
 
+// LoadConfig собирает конфигурацию сервера из args (флаги) и переменных окружения;
+// env переопределяет флаги. Тип хранилища выбирается по заданным DSN/пути к файлу.
 func LoadConfig(args []string) (*ServerConfig, error) {
 	raw, source := defaultRawServerConfig()
 	err := parseServerFlags(raw, source, args)

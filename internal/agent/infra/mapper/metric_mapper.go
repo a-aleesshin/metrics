@@ -1,3 +1,4 @@
+// Package mapper преобразует прикладные DTO метрик в JSON-структуры протокола сервера.
 package mapper
 
 import (
@@ -9,6 +10,8 @@ import (
 	httpdto "github.com/a-aleesshin/metrics/internal/agent/infra/dto"
 )
 
+// ToSendMetric конвертирует MetricDTO в MetricsSend: gauge — в Value (NaN/Inf → 0),
+// counter — в Delta; неизвестный тип или невалидное значение дают ошибку.
 func ToSendMetric(dto appdto.MetricDTO) (httpdto.MetricsSend, error) {
 	payload := httpdto.MetricsSend{
 		ID:    dto.Name,

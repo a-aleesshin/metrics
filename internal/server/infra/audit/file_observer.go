@@ -1,3 +1,5 @@
+// Package audit содержит инфраструктурные приёмники событий аудита:
+// запись в файл (FileObserver) и отправка на HTTP-приёмник (HTTPObserver).
 package audit
 
 import (
@@ -10,11 +12,15 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/audit"
 )
 
+// FileObserver пишет события аудита в файл в формате JSON, по одному в строке.
+// Потокобезопасен: запись сериализуется мьютексом.
 type FileObserver struct {
 	mu   sync.Mutex
 	file *os.File
 }
 
+// NewFileObserver открывает файл path на дозапись (создаёт при отсутствии)
+// и возвращает наблюдателя, пишущего в него события аудита.
 func NewFileObserver(path string) (*FileObserver, error) {
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 
@@ -25,6 +31,7 @@ func NewFileObserver(path string) (*FileObserver, error) {
 	return &FileObserver{file: file}, nil
 }
 
+// Notify сериализует событие в JSON и дописывает его строкой в файл.
 func (o *FileObserver) Notify(_ context.Context, event audit.Event) error {
 	data, err := json.Marshal(event)
 
@@ -44,6 +51,7 @@ func (o *FileObserver) Notify(_ context.Context, event audit.Event) error {
 	return nil
 }
 
+// Close закрывает файл журнала аудита.
 func (o *FileObserver) Close() error {
 	return o.file.Close()
 }

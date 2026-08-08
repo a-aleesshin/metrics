@@ -8,11 +8,13 @@ import (
 	"github.com/a-aleesshin/metrics/internal/agent/domain/metric"
 )
 
+// CollectSystemMetricsUseCase собирает системные метрики (память, CPU) в репозиторий.
 type CollectSystemMetricsUseCase struct {
 	systemReader reader.SystemReader
 	repository   repository.MetricRepository
 }
 
+// NewCollectSystemMetricsUseCase создаёт сценарий сбора системных метрик.
 func NewCollectSystemMetricsUseCase(systemReader reader.SystemReader, repository repository.MetricRepository) *CollectSystemMetricsUseCase {
 	return &CollectSystemMetricsUseCase{
 		systemReader: systemReader,
@@ -20,6 +22,7 @@ func NewCollectSystemMetricsUseCase(systemReader reader.SystemReader, repository
 	}
 }
 
+// Execute читает системные метрики и сохраняет их как gauge; NaN/Inf заменяются нулём.
 func (usecase *CollectSystemMetricsUseCase) Execute() error {
 	metrics, err := usecase.systemReader.Read()
 	if err != nil {

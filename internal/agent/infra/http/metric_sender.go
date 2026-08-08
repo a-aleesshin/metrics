@@ -1,3 +1,5 @@
+// Package httpadapter реализует отправку метрик на сервер по HTTP:
+// JSON → gzip → подпись HMAC → POST с ретраями.
 package httpadapter
 
 import (
@@ -25,15 +27,19 @@ var gzipBufferPool = sync.Pool{
 	New: func() any { return new(bytes.Buffer) },
 }
 
+// HTTPClient — минимальный интерфейс HTTP-клиента; ему удовлетворяет *http.Client.
 type HTTPClient interface {
+	// Do выполняет HTTP-запрос и возвращает ответ.
 	Do(request *http.Request) (*http.Response, error)
 }
 
+// MetricSender шлёт метрики на сервер gzip-сжатым JSON через POST /update и /updates.
 type MetricSender struct {
 	url    string
 	client HTTPClient
 }
 
+// NewMetricSender создаёт отправитель метрик; url нормализуется до базового адреса сервера.
 func NewMetricSender(url string, HTTPClient HTTPClient) *MetricSender {
 	return &MetricSender{
 		url:    normalizeBaseURL(url),
@@ -41,6 +47,7 @@ func NewMetricSender(url string, HTTPClient HTTPClient) *MetricSender {
 	}
 }
 
+// Send отправляет одну метрику запросом POST /update.
 func (m *MetricSender) Send(dto dto.MetricDTO) error {
 	payload, err := mapper.ToSendMetric(dto)
 
@@ -56,6 +63,7 @@ func (m *MetricSender) Send(dto dto.MetricDTO) error {
 	return m.sendGzippedJSON("/update", body)
 }
 
+// SendBatch отправляет пачку метрик одним запросом POST /updates; пустая пачка не отправляется.
 func (m *MetricSender) SendBatch(metrics []dto.MetricDTO) error {
 	if len(metrics) == 0 {
 		return nil

@@ -9,12 +9,16 @@ import (
 	"github.com/a-aleesshin/metrics/internal/platform/hash"
 )
 
+// HashSHA256Header — имя HTTP-заголовка с подписью HMAC-SHA256 тела запроса/ответа.
 const HashSHA256Header = "HashSHA256"
 
 var hashBufferPool = sync.Pool{
 	New: func() any { return new(bytes.Buffer) },
 }
 
+// WithHashSHA256 — middleware подписи HMAC-SHA256 с ключом key: проверяет подпись
+// тела запроса из заголовка HashSHA256 (при несовпадении — 400) и подписывает тело
+// ответа тем же заголовком. При пустом key middleware отключается.
 func WithHashSHA256(key string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		if key == "" {

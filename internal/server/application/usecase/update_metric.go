@@ -1,3 +1,6 @@
+// Package usecase содержит сценарии применения сервиса метрик:
+// обновление одной метрики, батч-обновление, чтение значения, список,
+// сохранение snapshot и восстановление из него.
 package usecase
 
 import (
@@ -11,22 +14,30 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
 )
 
+// SnapshotSaver сохраняет текущее состояние метрик в snapshot
+// после успешного обновления.
 type SnapshotSaver interface {
 	Execute(ctx context.Context) error
 }
 
+// UpdateMetricCommand — входные данные обновления одиночной метрики;
+// значение передаётся строкой и парсится по типу метрики.
 type UpdateMetricCommand struct {
 	Type  string
 	Name  string
 	Value string
 }
 
+// UpdateMetric — use case обновления одиночной метрики:
+// gauge перезаписывается, counter накапливается.
 type UpdateMetric struct {
 	repo          repository.MetricRepository
 	logger        logger.Logger
 	snapshotSaver SnapshotSaver
 }
 
+// NewUpdateMetric создаёт use case обновления одиночной метрики;
+// snapshotSaver может быть nil — тогда snapshot не сохраняется.
 func NewUpdateMetric(repo repository.MetricRepository, logger logger.Logger, snapshotSaver SnapshotSaver) *UpdateMetric {
 	return &UpdateMetric{
 		repo:          repo,
@@ -35,6 +46,8 @@ func NewUpdateMetric(repo repository.MetricRepository, logger logger.Logger, sna
 	}
 }
 
+// Execute применяет обновление метрики по типу из команды;
+// для неизвестного типа возвращает metric.ErrUnsupportedMetricType.
 func (u *UpdateMetric) Execute(ctx context.Context, cmd UpdateMetricCommand) error {
 	u.logger.Info("Executing update metric usecase", logger.String("name", cmd.Name))
 

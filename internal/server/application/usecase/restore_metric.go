@@ -8,12 +8,14 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
 )
 
+// RestoreMetricUseCase — use case восстановления метрик из snapshot-хранилища в репозиторий.
 type RestoreMetricUseCase struct {
 	repository         repository.MetricRepository
 	repositorySnapshot repository.MetricSnapshotStore
 	mapper             *mapper.MetricSnapshotMapper
 }
 
+// NewRestoreMetricUseCase создаёт use case восстановления метрик из snapshot.
 func NewRestoreMetricUseCase(repository repository.MetricRepository, repositorySnapshot repository.MetricSnapshotStore, mapper *mapper.MetricSnapshotMapper) *RestoreMetricUseCase {
 	return &RestoreMetricUseCase{
 		repository:         repository,
@@ -22,6 +24,8 @@ func NewRestoreMetricUseCase(repository repository.MetricRepository, repositoryS
 	}
 }
 
+// Execute загружает snapshot-ы, конвертирует их в доменные метрики
+// и сохраняет в репозиторий; останавливается на первой ошибке.
 func (u *RestoreMetricUseCase) Execute(ctx context.Context) error {
 	snapshots, err := u.repositorySnapshot.Load(ctx)
 
