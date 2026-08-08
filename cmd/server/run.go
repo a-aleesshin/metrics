@@ -19,6 +19,8 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/application/mapper"
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
+	"github.com/a-aleesshin/metrics/internal/server/audit"
+	infraaudit "github.com/a-aleesshin/metrics/internal/server/infra/audit"
 	snapshotfile "github.com/a-aleesshin/metrics/internal/server/infra/persistence/file"
 	"github.com/a-aleesshin/metrics/internal/server/infra/persistence/memory"
 	storagepostgres "github.com/a-aleesshin/metrics/internal/server/infra/persistence/postgres"
@@ -77,9 +79,15 @@ func run(cfg *cli.ServerConfig) error {
 		idGenerator,
 	)
 
-	updateHandler := metrics.NewUpdateHandler(updateMetricsUC)
-	updateJSONHandler := metrics.NewUpdateJsonHandler(updateMetricsUC)
-	updatesHandler := metrics.NewUpdatesHandler(updatesMetricsUC)
+	auditPublisher, auditCleanup, err := buildAuditPublisher(cfg, loggers.appLogger)
+	if err != nil {
+		return err
+	}
+	defer auditCleanup()
+
+	updateHandler := metrics.NewUpdateHandler(updateMetricsUC, auditPublisher)
+	updateJSONHandler := metrics.NewUpdateJsonHandler(updateMetricsUC, auditPublisher)
+	updatesHandler := metrics.NewUpdatesHandler(updatesMetricsUC, auditPublisher)
 
 	valueHandler := metrics.NewValueHandler(getValueMetricUC)
 	valueJSONHandler := metrics.NewValueJsonHandler(getValueMetricUC)
@@ -196,6 +204,28 @@ func buildLoggers() (*appLoggerRuntime, error) {
 		appLogger:  appLogger,
 		cleanup:    func() { _ = baseZap.Sync() },
 	}, nil
+}
+
+func buildAuditPublisher(cfg *cli.ServerConfig, appLogger sharedlogger.Logger) (*audit.Publisher, func(), error) {
+	publisher := audit.NewPublisher(appLogger)
+	cleanup := func() {}
+
+	if cfg.AuditFile != "" {
+		fileObserver, err := infraaudit.NewFileObserver(cfg.AuditFile)
+
+		if err != nil {
+			return nil, nil, fmt.Errorf("create audit file observer: %w", err)
+		}
+
+		publisher.Register(fileObserver)
+		cleanup = func() { _ = fileObserver.Close() }
+	}
+
+	if cfg.AuditURL != "" {
+		publisher.Register(infraaudit.NewHTTPObserver(cfg.AuditURL, nil))
+	}
+
+	return publisher, cleanup, nil
 }
 
 func buildStorageRuntime(ctx context.Context, cfg *cli.ServerConfig) (*storageRuntime, error) {

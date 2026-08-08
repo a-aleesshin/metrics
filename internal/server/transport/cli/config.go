@@ -30,6 +30,8 @@ type ServerConfig struct {
 	Postgres        *postgres.Config
 	StorageType     string
 	KeySignature    string
+	AuditFile       string
+	AuditURL        string
 }
 
 type rawServerConfig struct {
@@ -40,6 +42,8 @@ type rawServerConfig struct {
 	Postgres        string `env:"DATABASE_DSN"`
 	StorageType     string `env:"STORAGE_TYPE"`
 	KeySignature    string `env:"KEY"`
+	AuditFile       string `env:"AUDIT_FILE"`
+	AuditURL        string `env:"AUDIT_URL"`
 }
 
 type rawServerConfigSource struct {
@@ -103,6 +107,8 @@ func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, ar
 	fs.StringVar(&raw.Postgres, "d", raw.Postgres, "database DSN")
 	fs.BoolVar(&raw.Restore, "r", raw.Restore, "restore metrics from file on startup")
 	fs.StringVar(&raw.KeySignature, "k", raw.KeySignature, "key signature")
+	fs.StringVar(&raw.AuditFile, "audit-file", raw.AuditFile, "path to audit log file (audit disabled if empty)")
+	fs.StringVar(&raw.AuditURL, "audit-url", raw.AuditURL, "URL to send audit events to (audit disabled if empty)")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("failed to parse command line arguments: %w", err)
@@ -189,5 +195,7 @@ func buildServerConfig(raw *rawServerConfig, source *rawServerConfigSource) (*Se
 		Postgres:        postgresConfig,
 		StorageType:     typeStorage,
 		KeySignature:    raw.KeySignature,
+		AuditFile:       raw.AuditFile,
+		AuditURL:        raw.AuditURL,
 	}, nil
 }

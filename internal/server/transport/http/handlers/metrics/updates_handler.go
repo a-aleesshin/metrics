@@ -16,10 +16,11 @@ type UpdatesMetricsUseCase interface {
 
 type UpdatesHandler struct {
 	useCase UpdatesMetricsUseCase
+	audit   AuditPublisher
 }
 
-func NewUpdatesHandler(useCase UpdatesMetricsUseCase) *UpdatesHandler {
-	return &UpdatesHandler{useCase: useCase}
+func NewUpdatesHandler(useCase UpdatesMetricsUseCase, audit AuditPublisher) *UpdatesHandler {
+	return &UpdatesHandler{useCase: useCase, audit: audit}
 }
 
 func (h *UpdatesHandler) Updates(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +80,15 @@ func (h *UpdatesHandler) Updates(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httperror.WriteError(w, err)
 		return
+	}
+
+	if h.audit != nil {
+		names := make([]string, 0, len(metricsUpdated))
+		for _, m := range metricsUpdated {
+			names = append(names, m.Name)
+		}
+
+		h.audit.Publish(r.Context(), names, platformhttp.ClientIP(r))
 	}
 
 	w.Header().Set("Content-Type", "application/json")

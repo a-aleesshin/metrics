@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	platformhttp "github.com/a-aleesshin/metrics/internal/platform/http"
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
 	"github.com/a-aleesshin/metrics/internal/server/transport/http/httperror"
 	"github.com/go-chi/chi/v5"
@@ -13,12 +14,17 @@ type UpdateMetricsUseCase interface {
 	Execute(ctx context.Context, command usecase.UpdateMetricCommand) error
 }
 
-type UpdateHandler struct {
-	updateMetric UpdateMetricsUseCase
+type AuditPublisher interface {
+	Publish(ctx context.Context, metricNames []string, ipAddress string)
 }
 
-func NewUpdateHandler(updateMetric UpdateMetricsUseCase) *UpdateHandler {
-	return &UpdateHandler{updateMetric: updateMetric}
+type UpdateHandler struct {
+	updateMetric UpdateMetricsUseCase
+	audit        AuditPublisher
+}
+
+func NewUpdateHandler(updateMetric UpdateMetricsUseCase, audit AuditPublisher) *UpdateHandler {
+	return &UpdateHandler{updateMetric: updateMetric, audit: audit}
 }
 
 func (h *UpdateHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +43,10 @@ func (h *UpdateHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httperror.WriteError(w, err)
 		return
+	}
+
+	if h.audit != nil {
+		h.audit.Publish(r.Context(), []string{name}, platformhttp.ClientIP(r))
 	}
 
 	w.WriteHeader(http.StatusOK)

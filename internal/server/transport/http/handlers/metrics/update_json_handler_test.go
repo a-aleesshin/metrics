@@ -118,7 +118,7 @@ func TestHandler_UpdateJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
 			useCaseSpy := &updateMetricUseCaseSpy{err: tt.useCaseErr}
-			handler := NewUpdateJsonHandler(useCaseSpy)
+			handler := NewUpdateJsonHandler(useCaseSpy, nil)
 
 			r := chi.NewRouter()
 			r.Post("/update", handler.UpdateJSON)

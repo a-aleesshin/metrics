@@ -12,10 +12,11 @@ import (
 
 type UpdateJsonHandler struct {
 	updateMetric UpdateMetricsUseCase
+	audit        AuditPublisher
 }
 
-func NewUpdateJsonHandler(usecase UpdateMetricsUseCase) *UpdateJsonHandler {
-	return &UpdateJsonHandler{updateMetric: usecase}
+func NewUpdateJsonHandler(usecase UpdateMetricsUseCase, audit AuditPublisher) *UpdateJsonHandler {
+	return &UpdateJsonHandler{updateMetric: usecase, audit: audit}
 }
 
 func (h *UpdateJsonHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +66,10 @@ func (h *UpdateJsonHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httperror.WriteError(w, err)
 		return
+	}
+
+	if h.audit != nil {
+		h.audit.Publish(r.Context(), []string{req.ID}, platformhttp.ClientIP(r))
 	}
 
 	w.Header().Set("Content-Type", "application/json")

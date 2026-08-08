@@ -15,9 +15,9 @@ func TestHandler_RegisterRoutes_Smoke(t *testing.T) {
 	updatesUC := updatesUseCaseNoop{}
 
 	h := NewHandler(
-		NewUpdateHandler(updateUC),
-		NewUpdateJsonHandler(updateUC),
-		NewUpdatesHandler(updatesUC),
+		NewUpdateHandler(updateUC, nil),
+		NewUpdateJsonHandler(updateUC, nil),
+		NewUpdatesHandler(updatesUC, nil),
 		NewValueHandler(valueUC),
 		NewValueJsonHandler(valueUC),
 		NewListMetricsHandler(listUC),
