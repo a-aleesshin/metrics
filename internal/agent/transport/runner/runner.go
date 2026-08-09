@@ -68,7 +68,7 @@ func (r *AgentRunner) Run(ctx context.Context) error {
 
 	for i := 0; i < r.rateLimit; i++ {
 		wg.Add(1)
-		go r.runReportWorker(ctx, &wg, jobs)
+		go r.runReportWorker(&wg, jobs)
 	}
 
 	wg.Add(1)
@@ -81,15 +81,12 @@ func (r *AgentRunner) Run(ctx context.Context) error {
 
 	reportTicker := time.NewTicker(r.reportInterval)
 	defer reportTicker.Stop()
-	defer func() {
-		close(jobs)
-		wg.Wait()
-	}()
 
+loop:
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			break loop
 		case <-reportTicker.C:
 			metrics, err := r.reportUseCase.BuildMetrics()
 			if err != nil {
@@ -104,9 +101,34 @@ func (r *AgentRunner) Run(ctx context.Context) error {
 			select {
 			case jobs <- metrics:
 			case <-ctx.Done():
-				return nil
+				break loop
 			}
 		}
+	}
+
+	close(jobs)
+	wg.Wait()
+
+	r.reportFinal()
+
+	return nil
+}
+
+// reportFinal синхронно отправляет текущее состояние метрик; ошибки логируются,
+// но не прерывают завершение.
+func (r *AgentRunner) reportFinal() {
+	metrics, err := r.reportUseCase.BuildMetrics()
+	if err != nil {
+		r.logger.Error("build final metrics report failed", portlogger.Err(err))
+		return
+	}
+
+	if len(metrics) == 0 {
+		return
+	}
+
+	if err := r.reportUseCase.SendMetrics(metrics); err != nil {
+		r.logger.Error("send final metrics report failed", portlogger.Err(err))
 	}
 }
 
@@ -146,21 +168,14 @@ func (r *AgentRunner) runSystemCollector(ctx context.Context, wg *sync.WaitGroup
 	}
 }
 
-func (r *AgentRunner) runReportWorker(ctx context.Context, wg *sync.WaitGroup, jobs <-chan []dto.MetricDTO) {
+// runReportWorker отправляет батчи из очереди до её закрытия. Воркер намеренно
+// не следит за ctx: при завершении он дорабатывает уже принятые батчи.
+func (r *AgentRunner) runReportWorker(wg *sync.WaitGroup, jobs <-chan []dto.MetricDTO) {
 	defer wg.Done()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case metrics, ok := <-jobs:
-			if !ok {
-				return
-			}
-
-			if err := r.reportUseCase.SendMetrics(metrics); err != nil {
-				r.logger.Error("report metrics failed", portlogger.Err(err))
-			}
+	for metrics := range jobs {
+		if err := r.reportUseCase.SendMetrics(metrics); err != nil {
+			r.logger.Error("report metrics failed", portlogger.Err(err))
 		}
 	}
 }

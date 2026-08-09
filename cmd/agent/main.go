@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/a-aleesshin/metrics/internal/agent/application/usecase"
 	httpadapter "github.com/a-aleesshin/metrics/internal/agent/infra/http"
@@ -93,7 +94,7 @@ func run() error {
 		appLogger,
 	)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
 	return agentRunner.Run(ctx)

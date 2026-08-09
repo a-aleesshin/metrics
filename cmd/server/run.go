@@ -130,7 +130,7 @@ func run(cfg *cli.ServerConfig) error {
 		Handler: router,
 	}
 
-	serverCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	serverCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
 	startPeriodicSnapshot(serverCtx, cfg.StoreInterval, runtime.periodicSaver)
