@@ -9,13 +9,15 @@ import (
 	"time"
 )
 
-// AgentConfig — параметры запуска агента: адрес сервера, интервалы, ключ подписи и лимит воркеров.
+// AgentConfig — параметры запуска агента: адрес сервера, интервалы, ключ подписи,
+// лимит воркеров и путь к публичному ключу шифрования.
 type AgentConfig struct {
 	Address        string `env:"ADDRESS"`
 	ReportInterval time.Duration
 	PollInterval   time.Duration
 	KeySignature   string
 	RateLimit      int
+	CryptoKey      string
 }
 
 var (
@@ -35,6 +37,7 @@ func LoadConfig(args []string) (*AgentConfig, error) {
 
 	var address string
 	var keySignature string
+	var cryptoKey string
 	var reportInterval int
 	var pollInterval int
 	var rateLimit int
@@ -44,6 +47,7 @@ func LoadConfig(args []string) (*AgentConfig, error) {
 	fs.IntVar(&pollInterval, "p", pollIntervalDefault, "poll interval in seconds")
 	fs.StringVar(&keySignature, "k", keySignatureDefault, "key signature")
 	fs.IntVar(&rateLimit, "l", rateLimitDefault, "outgoing requests rate limit")
+	fs.StringVar(&cryptoKey, "crypto-key", "", "path to RSA public key PEM file (encryption disabled if empty)")
 
 	err := fs.Parse(args)
 
@@ -76,6 +80,7 @@ func LoadConfig(args []string) (*AgentConfig, error) {
 	config.PollInterval = time.Duration(valuePollInterval) * time.Second
 
 	config.KeySignature = getOptionalStringValue(&keySignature, "KEY")
+	config.CryptoKey = getOptionalStringValue(&cryptoKey, "CRYPTO_KEY")
 
 	valueRateLimit, err := getIntValue(&rateLimit, "RATE_LIMIT")
 

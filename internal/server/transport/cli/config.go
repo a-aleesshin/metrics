@@ -40,6 +40,7 @@ type ServerConfig struct {
 	KeySignature    string
 	AuditFile       string
 	AuditURL        string
+	CryptoKey       string
 }
 
 type rawServerConfig struct {
@@ -52,6 +53,7 @@ type rawServerConfig struct {
 	KeySignature    string `env:"KEY"`
 	AuditFile       string `env:"AUDIT_FILE"`
 	AuditURL        string `env:"AUDIT_URL"`
+	CryptoKey       string `env:"CRYPTO_KEY"`
 }
 
 type rawServerConfigSource struct {
@@ -119,6 +121,7 @@ func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, ar
 	fs.StringVar(&raw.KeySignature, "k", raw.KeySignature, "key signature")
 	fs.StringVar(&raw.AuditFile, "audit-file", raw.AuditFile, "path to audit log file (audit disabled if empty)")
 	fs.StringVar(&raw.AuditURL, "audit-url", raw.AuditURL, "URL to send audit events to (audit disabled if empty)")
+	fs.StringVar(&raw.CryptoKey, "crypto-key", raw.CryptoKey, "path to RSA private key PEM file (decryption disabled if empty)")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("failed to parse command line arguments: %w", err)
@@ -207,5 +210,6 @@ func buildServerConfig(raw *rawServerConfig, source *rawServerConfigSource) (*Se
 		KeySignature:    raw.KeySignature,
 		AuditFile:       raw.AuditFile,
 		AuditURL:        raw.AuditURL,
+		CryptoKey:       raw.CryptoKey,
 	}, nil
 }

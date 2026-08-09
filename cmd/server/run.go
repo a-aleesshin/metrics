@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	platformcrypto "github.com/a-aleesshin/metrics/internal/platform/crypto"
 	platformpostgres "github.com/a-aleesshin/metrics/internal/platform/db/postgres"
 	"github.com/a-aleesshin/metrics/internal/platform/health"
 	sharedrouter "github.com/a-aleesshin/metrics/internal/platform/http"
@@ -106,9 +108,15 @@ func run(cfg *cli.ServerConfig) error {
 	pingHandler := healths.NewPingHandler(runtime.healthService)
 	healthHandler := healths.NewHandler(pingHandler)
 
+	privateKey, err := loadPrivateKey(cfg)
+	if err != nil {
+		return err
+	}
+
 	router := sharedrouter.New(
 		[]func(http.Handler) http.Handler{
 			middleware.WithHashSHA256(cfg.KeySignature),
+			middleware.DecryptRequest(privateKey),
 			middleware.DecompressRequest,
 			middleware.CompressResponse,
 			middleware.RequestLogger(loggers.httpLogger),
@@ -204,6 +212,21 @@ func buildLoggers() (*appLoggerRuntime, error) {
 		appLogger:  appLogger,
 		cleanup:    func() { _ = baseZap.Sync() },
 	}, nil
+}
+
+// loadPrivateKey загружает RSA-приватный ключ для расшифровки запросов;
+// при пустом пути шифрование выключено и возвращается nil.
+func loadPrivateKey(cfg *cli.ServerConfig) (*rsa.PrivateKey, error) {
+	if cfg.CryptoKey == "" {
+		return nil, nil
+	}
+
+	privateKey, err := platformcrypto.LoadPrivateKey(cfg.CryptoKey)
+	if err != nil {
+		return nil, fmt.Errorf("load crypto private key: %w", err)
+	}
+
+	return privateKey, nil
 }
 
 func buildAuditPublisher(cfg *cli.ServerConfig, appLogger sharedlogger.Logger) (*audit.Publisher, func(), error) {
