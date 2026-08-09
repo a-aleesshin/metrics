@@ -16,11 +16,21 @@ import (
 	systemadapter "github.com/a-aleesshin/metrics/internal/agent/infra/system"
 	"github.com/a-aleesshin/metrics/internal/agent/transport/cli"
 	"github.com/a-aleesshin/metrics/internal/agent/transport/runner"
+	"github.com/a-aleesshin/metrics/internal/platform/buildinfo"
 	"github.com/a-aleesshin/metrics/internal/platform/logger"
 	"go.uber.org/zap"
 )
 
+// Информация о сборке, значения подставляются при сборке через
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	buildinfo.Print(buildVersion, buildDate, buildCommit)
+
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}
