@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -26,6 +27,7 @@ const (
 	ValueSourceDefault ValueSource = "default"
 	ValueSourceFlag    ValueSource = "flag"
 	ValueSourceEnv     ValueSource = "env"
+	ValueSourceFile    ValueSource = "file"
 )
 
 // ServerConfig — итоговая конфигурация сервера метрик: адрес, параметры хранилища,
@@ -63,6 +65,23 @@ type rawServerConfigSource struct {
 	Restore         ValueSource
 	Postgres        ValueSource
 	KeySignature    ValueSource
+	AuditFile       ValueSource
+	AuditURL        ValueSource
+	CryptoKey       ValueSource
+}
+
+// fileServerConfig — формат JSON-файла конфигурации сервера.
+// Интервалы задаются строками длительности ("1s", "5m").
+type fileServerConfig struct {
+	Address       string `json:"address"`
+	Restore       *bool  `json:"restore"`
+	StoreInterval string `json:"store_interval"`
+	StoreFile     string `json:"store_file"`
+	DatabaseDSN   string `json:"database_dsn"`
+	CryptoKey     string `json:"crypto_key"`
+	Key           string `json:"key"`
+	AuditFile     string `json:"audit_file"`
+	AuditURL      string `json:"audit_url"`
 }
 
 func defaultRawServerConfig() (*rawServerConfig, *rawServerConfigSource) {
@@ -82,14 +101,19 @@ func defaultRawServerConfig() (*rawServerConfig, *rawServerConfigSource) {
 			Restore:         ValueSourceDefault,
 			Postgres:        ValueSourceDefault,
 			KeySignature:    ValueSourceDefault,
+			AuditFile:       ValueSourceDefault,
+			AuditURL:        ValueSourceDefault,
+			CryptoKey:       ValueSourceDefault,
 		}
 }
 
-// LoadConfig собирает конфигурацию сервера из args (флаги) и переменных окружения;
-// env переопределяет флаги. Тип хранилища выбирается по заданным DSN/пути к файлу.
+// LoadConfig собирает конфигурацию сервера из args (флаги), переменных окружения
+// и JSON-файла (флаг -c/-config или переменная CONFIG). Приоритет источников:
+// env > флаги > файл > значения по умолчанию. Тип хранилища выбирается
+// по заданным DSN/пути к файлу.
 func LoadConfig(args []string) (*ServerConfig, error) {
 	raw, source := defaultRawServerConfig()
-	err := parseServerFlags(raw, source, args)
+	configPath, err := parseServerFlags(raw, source, args)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse command line arguments: %w", err)
@@ -101,6 +125,14 @@ func LoadConfig(args []string) (*ServerConfig, error) {
 
 	markEnvSources(source)
 
+	if envPath := os.Getenv("CONFIG"); envPath != "" {
+		configPath = envPath
+	}
+
+	if err := applyFileConfig(configPath, raw, source); err != nil {
+		return nil, err
+	}
+
 	cfg, err := buildServerConfig(raw, source)
 
 	if err != nil {
@@ -110,8 +142,80 @@ func LoadConfig(args []string) (*ServerConfig, error) {
 	return cfg, nil
 }
 
-func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, args []string) error {
+// applyFileConfig подставляет значения из JSON-файла для параметров,
+// не заданных ни флагом, ни переменной окружения.
+func applyFileConfig(path string, raw *rawServerConfig, source *rawServerConfigSource) error {
+	if path == "" {
+		return nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read config file: %w", err)
+	}
+
+	var file fileServerConfig
+	if err := json.Unmarshal(data, &file); err != nil {
+		return fmt.Errorf("parse config file %s: %w", path, err)
+	}
+
+	if source.Address == ValueSourceDefault && file.Address != "" {
+		raw.Address = file.Address
+		source.Address = ValueSourceFile
+	}
+
+	if source.StoreInterval == ValueSourceDefault && file.StoreInterval != "" {
+		interval, err := time.ParseDuration(file.StoreInterval)
+		if err != nil {
+			return fmt.Errorf("config file %s: parse store_interval: %w", path, err)
+		}
+
+		raw.StoreInterval = int(interval.Seconds())
+		source.StoreInterval = ValueSourceFile
+	}
+
+	if source.FileStoragePath == ValueSourceDefault && file.StoreFile != "" {
+		raw.FileStoragePath = file.StoreFile
+		source.FileStoragePath = ValueSourceFile
+	}
+
+	if source.Restore == ValueSourceDefault && file.Restore != nil {
+		raw.Restore = *file.Restore
+		source.Restore = ValueSourceFile
+	}
+
+	if source.Postgres == ValueSourceDefault && file.DatabaseDSN != "" {
+		raw.Postgres = file.DatabaseDSN
+		source.Postgres = ValueSourceFile
+	}
+
+	if source.KeySignature == ValueSourceDefault && file.Key != "" {
+		raw.KeySignature = file.Key
+		source.KeySignature = ValueSourceFile
+	}
+
+	if source.AuditFile == ValueSourceDefault && file.AuditFile != "" {
+		raw.AuditFile = file.AuditFile
+		source.AuditFile = ValueSourceFile
+	}
+
+	if source.AuditURL == ValueSourceDefault && file.AuditURL != "" {
+		raw.AuditURL = file.AuditURL
+		source.AuditURL = ValueSourceFile
+	}
+
+	if source.CryptoKey == ValueSourceDefault && file.CryptoKey != "" {
+		raw.CryptoKey = file.CryptoKey
+		source.CryptoKey = ValueSourceFile
+	}
+
+	return nil
+}
+
+func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, args []string) (string, error) {
 	fs := flag.NewFlagSet("server", flag.ContinueOnError)
+
+	var configPath string
 
 	fs.StringVar(&raw.Address, "a", raw.Address, "HTTP server address")
 	fs.IntVar(&raw.StoreInterval, "i", raw.StoreInterval, "store interval in seconds")
@@ -122,9 +226,11 @@ func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, ar
 	fs.StringVar(&raw.AuditFile, "audit-file", raw.AuditFile, "path to audit log file (audit disabled if empty)")
 	fs.StringVar(&raw.AuditURL, "audit-url", raw.AuditURL, "URL to send audit events to (audit disabled if empty)")
 	fs.StringVar(&raw.CryptoKey, "crypto-key", raw.CryptoKey, "path to RSA private key PEM file (decryption disabled if empty)")
+	fs.StringVar(&configPath, "c", configPath, "path to JSON config file")
+	fs.StringVar(&configPath, "config", configPath, "path to JSON config file")
 
 	if err := fs.Parse(args); err != nil {
-		return fmt.Errorf("failed to parse command line arguments: %w", err)
+		return "", fmt.Errorf("failed to parse command line arguments: %w", err)
 	}
 
 	fs.Visit(func(f *flag.Flag) {
@@ -141,10 +247,16 @@ func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, ar
 			rawSource.Restore = ValueSourceFlag
 		case "k":
 			rawSource.KeySignature = ValueSourceFlag
+		case "audit-file":
+			rawSource.AuditFile = ValueSourceFlag
+		case "audit-url":
+			rawSource.AuditURL = ValueSourceFlag
+		case "crypto-key":
+			rawSource.CryptoKey = ValueSourceFlag
 		}
 	})
 
-	return nil
+	return configPath, nil
 }
 
 func markEnvSources(sources *rawServerConfigSource) {
@@ -170,6 +282,18 @@ func markEnvSources(sources *rawServerConfigSource) {
 
 	if _, ok := os.LookupEnv("KEY"); ok {
 		sources.KeySignature = ValueSourceEnv
+	}
+
+	if value, ok := os.LookupEnv("AUDIT_FILE"); ok && value != "" {
+		sources.AuditFile = ValueSourceEnv
+	}
+
+	if value, ok := os.LookupEnv("AUDIT_URL"); ok && value != "" {
+		sources.AuditURL = ValueSourceEnv
+	}
+
+	if value, ok := os.LookupEnv("CRYPTO_KEY"); ok && value != "" {
+		sources.CryptoKey = ValueSourceEnv
 	}
 }
 
