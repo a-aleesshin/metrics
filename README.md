@@ -47,6 +47,32 @@ git fetch template && git checkout template/v2 .github
 
 Бенчмарки компонентов лежат в `internal/server/bench`
 
+Базовый профиль (`profiles/base.pprof`) показал три источника лишних аллокаций:
+
+- `gzip.NewWriter` в compress-middleware создавался на каждый ответ — это ~88%
+  всего alloc_space: writer держит ~800 КБ внутренних буферов flate, которые
+  выделялись и выбрасывались на каждом запросе ради сжатия десятков байт JSON;
+- hash-middleware на каждый запрос читал тело через `io.ReadAll` и заводил
+  новый `bytes.Buffer` под буферизацию ответа;
+- list-хендлер парсил HTML-шаблон страницы метрик на каждый запрос
+  (~3000 allocs/op у `BenchmarkHTTP_List`).
+
+Оптимизации: `sync.Pool` для `gzip.Writer`/`gzip.Reader` с `Reset()` вместо
+создания новых, пул буферов в hash-middleware, разовый парсинг шаблона
+при старте пакета.
+
+До и после (на операцию):
+
+| Бенчмарк | До | После |
+|---|---|---|
+| HTTP_UpdateJSON | 826016 B/op, 94 allocs | 13169 B/op, 72 allocs |
+| HTTP_UpdatesBatch | 831849 B/op, 271 allocs | 29606 B/op, 252 allocs |
+| HTTP_List | 912381 B/op, 3013 allocs | 83117 B/op, 2853 allocs |
+
+По изменениям профилей аллокации сократились на ~75 ГБ за запуск (−87% alloc_space):
+`flate.NewWriter` + `initDeflate` дали −74.7 ГБ, `io.ReadAll` в hash-middleware
+−530 МБ, путь `template.Execute` в list-хендлере −3.5 ГБ.
+
 Итог сравнения профилей (`pprof -top -diff_base=profiles/base.pprof profiles/result.pprof`):
 
 ```
