@@ -4,6 +4,7 @@ package audit
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	sharedlogger "github.com/a-aleesshin/metrics/internal/shared/port/logger"
@@ -27,6 +28,7 @@ type Observer interface {
 
 // Publisher рассылает события аудита зарегистрированным наблюдателям.
 type Publisher struct {
+	mu        sync.RWMutex
 	observers []Observer
 	logger    sharedlogger.Logger
 	now       func() time.Time
@@ -47,12 +49,17 @@ func (p *Publisher) Register(observer Observer) {
 		return
 	}
 
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.observers = append(p.observers, observer)
 }
 
 // Publish формирует событие с текущим временем и рассылает его всем наблюдателям.
-// Ошибки доставки логируются и не прерывают рассылку.
 func (p *Publisher) Publish(ctx context.Context, metricNames []string, ipAddress string) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	if len(p.observers) == 0 {
 		return
 	}
@@ -63,9 +70,19 @@ func (p *Publisher) Publish(ctx context.Context, metricNames []string, ipAddress
 		IPAddress: ipAddress,
 	}
 
+	var wg sync.WaitGroup
+
 	for _, observer := range p.observers {
-		if err := observer.Notify(ctx, event); err != nil && p.logger != nil {
-			p.logger.Error("audit notify failed", sharedlogger.Err(err))
-		}
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			if err := observer.Notify(ctx, event); err != nil && p.logger != nil {
+				p.logger.Error("audit notify failed", sharedlogger.Err(err))
+			}
+		}()
 	}
+
+	wg.Wait()
 }

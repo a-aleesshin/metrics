@@ -88,9 +88,8 @@ func BenchmarkCollectMetrics(b *testing.B) {
 	collect := newCollectUseCase(repo)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := collect.Execute(); err != nil {
 			b.Fatalf("collect: %v", err)
 		}
@@ -104,9 +103,8 @@ func BenchmarkBuildMetrics(b *testing.B) {
 	report := newReportUseCase(repo)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := report.BuildMetrics(); err != nil {
 			b.Fatalf("build metrics: %v", err)
 		}
@@ -120,9 +118,8 @@ func BenchmarkReportMetrics(b *testing.B) {
 	report := newReportUseCase(repo)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := report.Execute(); err != nil {
 			b.Fatalf("report: %v", err)
 		}
@@ -138,9 +135,8 @@ func BenchmarkSendBatch(b *testing.B) {
 	batch := buildBatch(b, 30)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := sender.SendBatch(batch); err != nil {
 			b.Fatalf("send batch: %v", err)
 		}
