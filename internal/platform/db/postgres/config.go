@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// Config — валидированные параметры подключения к PostgreSQL.
 type Config struct {
 	Host     string
 	Port     uint16
@@ -63,10 +64,12 @@ func validatedConfig(cfg *Config) (*Config, error) {
 	}
 }
 
+// NewConfigFromString разбирает DSN в формате URL или key=value и возвращает
+// валидированную конфигурацию. Поддерживаемые форматы:
+//
+//	postgres://user:password@host:5432/dbname?sslmode=disable
+//	host=localhost port=5432 user=postgres password=postgres dbname=postgres sslmode=disable
 func NewConfigFromString(dsn string) (*Config, error) {
-	// patterns
-	// postgres://user:password@host:5432/dbname?sslmode=disable
-	// host=localhost port=5432 user=postgres password=postgres dbname=postgres sslmode=disable
 	if dsn == "" {
 		return nil, fmt.Errorf("DSN cannot be empty")
 	}
@@ -95,6 +98,7 @@ func NewConfigFromString(dsn string) (*Config, error) {
 	return newConfig(pc.Host, pc.Port, pc.User, pc.Password, pc.Database, sslMode)
 }
 
+// ConnectionString собирает DSN в формате postgres://... из полей конфигурации.
 func (c *Config) ConnectionString() string {
 	dsn := &url.URL{
 		Scheme: "postgres",

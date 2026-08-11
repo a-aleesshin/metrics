@@ -9,16 +9,19 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
 )
 
+// ListMetricUseCase — use case получения списка всех метрик.
 type ListMetricUseCase struct {
 	repo repository.MetricQueryRepository
 }
 
+// NewListMetricUseCase создаёт use case получения списка метрик.
 func NewListMetricUseCase(repo repository.MetricQueryRepository) *ListMetricUseCase {
 	return &ListMetricUseCase{
 		repo: repo,
 	}
 }
 
+// Execute возвращает все gauge и counter, отсортированные по типу и имени.
 func (u *ListMetricUseCase) Execute(ctx context.Context) (dto.ListMetricsResult, error) {
 	gauges, err := u.repo.ListGauges(ctx)
 

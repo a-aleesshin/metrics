@@ -1,3 +1,5 @@
+// Package postgres реализует хранилища метрик поверх PostgreSQL
+// с повторами ретраебельных ошибок.
 package postgres
 
 import (
@@ -18,14 +20,18 @@ const (
 	metricTypeCounter = "counter"
 )
 
+// PostgresStorage — PostgreSQL-хранилище метрик: чтение/запись отдельных метрик
+// и snapshot-операции Save/Load.
 type PostgresStorage struct {
 	pool *pgxpool.Pool
 }
 
+// NewPostgresStorage создаёт PostgreSQL-хранилище метрик на пуле соединений.
 func NewPostgresStorage(pool *pgxpool.Pool) *PostgresStorage {
 	return &PostgresStorage{pool: pool}
 }
 
+// GetGaugeByName возвращает gauge по имени или nil, если строка не найдена.
 func (p PostgresStorage) GetGaugeByName(ctx context.Context, name metric.Name) (*metric.Gauge, error) {
 	var id string
 	var metricName string
@@ -57,6 +63,7 @@ func (p PostgresStorage) GetGaugeByName(ctx context.Context, name metric.Name) (
 	return gauge, nil
 }
 
+// GetCounterByName возвращает counter по имени или nil, если строка не найдена.
 func (p PostgresStorage) GetCounterByName(ctx context.Context, name metric.Name) (*metric.Counter, error) {
 	var id string
 	var metricName string
@@ -88,6 +95,7 @@ func (p PostgresStorage) GetCounterByName(ctx context.Context, name metric.Name)
 	return counter, nil
 }
 
+// SaveGauge сохраняет gauge upsert-ом с перезаписью значения.
 func (p PostgresStorage) SaveGauge(ctx context.Context, gauge *metric.Gauge) error {
 	sql := `
 			INSERT INTO metric (id, name, type, gauge_value, counter_value) VALUES ($1, $2, $3, $4, NULL)
@@ -117,6 +125,7 @@ func (p PostgresStorage) SaveGauge(ctx context.Context, gauge *metric.Gauge) err
 	return nil
 }
 
+// SaveCounter сохраняет counter upsert-ом с перезаписью значения.
 func (p PostgresStorage) SaveCounter(ctx context.Context, counter *metric.Counter) error {
 	sql := `
 			INSERT INTO metric (id, name, type, gauge_value, counter_value) VALUES ($1, $2, $3, NULL, $4)
@@ -146,6 +155,8 @@ func (p PostgresStorage) SaveCounter(ctx context.Context, counter *metric.Counte
 	return nil
 }
 
+// Save записывает snapshot-ы в одной транзакции upsert-ами;
+// counter-значения при конфликте суммируются.
 func (p PostgresStorage) Save(ctx context.Context, metrics []repository.MetricSnapshot) error {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
@@ -190,6 +201,7 @@ func (p PostgresStorage) Save(ctx context.Context, metrics []repository.MetricSn
 	return nil
 }
 
+// Load возвращает все метрики как snapshot-ы, отсортированные по типу и имени.
 func (p PostgresStorage) Load(ctx context.Context) ([]repository.MetricSnapshot, error) {
 	query := `SELECT id, type, gauge_value, counter_value FROM metric ORDER BY type, name`
 

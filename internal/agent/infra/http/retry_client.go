@@ -8,11 +8,14 @@ import (
 	"github.com/a-aleesshin/metrics/internal/platform/retry"
 )
 
+// RetryClient — декоратор HTTPClient, повторяющий запрос при сетевых ошибках.
 type RetryClient struct {
 	client HTTPClient
 	delays []time.Duration
 }
 
+// NewRetryClient создаёт RetryClient с задержками по умолчанию;
+// при nil client используется http.DefaultClient.
 func NewRetryClient(client HTTPClient) *RetryClient {
 	if client == nil {
 		client = http.DefaultClient
@@ -23,6 +26,7 @@ func NewRetryClient(client HTTPClient) *RetryClient {
 	}
 }
 
+// NewRetryClientWithDelays создаёт RetryClient с заданными задержками между повторами.
 func NewRetryClientWithDelays(client HTTPClient, delays []time.Duration) *RetryClient {
 	retryClient := NewRetryClient(client)
 	retryClient.delays = delays
@@ -30,6 +34,7 @@ func NewRetryClientWithDelays(client HTTPClient, delays []time.Duration) *RetryC
 	return retryClient
 }
 
+// Do выполняет запрос с повторами: тело клонируется через GetBody перед каждой попыткой.
 func (c *RetryClient) Do(request *http.Request) (*http.Response, error) {
 	var response *http.Response
 

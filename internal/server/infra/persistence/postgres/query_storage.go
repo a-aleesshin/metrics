@@ -13,14 +13,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// QueryPostgresStorage — PostgreSQL-реализация запросов чтения метрик.
 type QueryPostgresStorage struct {
 	pool *pgxpool.Pool
 }
 
+// NewQueryPostgresStorage создаёт хранилище запросов чтения на пуле соединений.
 func NewQueryPostgresStorage(pool *pgxpool.Pool) *QueryPostgresStorage {
 	return &QueryPostgresStorage{pool: pool}
 }
 
+// ListGauges возвращает все gauge, отсортированные по имени.
 func (q QueryPostgresStorage) ListGauges(ctx context.Context) ([]repository.GaugeSnapshot, error) {
 	query := `
 		SELECT name, gauge_value
@@ -64,6 +67,7 @@ func (q QueryPostgresStorage) ListGauges(ctx context.Context) ([]repository.Gaug
 	return out, nil
 }
 
+// ListCounters возвращает все counter-ы, отсортированные по имени.
 func (q QueryPostgresStorage) ListCounters(ctx context.Context) ([]repository.CounterSnapshot, error) {
 	query := `
 		SELECT name, counter_value
@@ -107,6 +111,7 @@ func (q QueryPostgresStorage) ListCounters(ctx context.Context) ([]repository.Co
 	return out, nil
 }
 
+// FindGaugeByName возвращает значение gauge и флаг его наличия.
 func (q QueryPostgresStorage) FindGaugeByName(ctx context.Context, name metric.Name) (value float64, found bool, err error) {
 	var id string
 	var metricName string
@@ -143,6 +148,7 @@ func (q QueryPostgresStorage) FindGaugeByName(ctx context.Context, name metric.N
 	return gauge.Value(), true, nil
 }
 
+// FindCounterByName возвращает значение counter и флаг его наличия.
 func (q QueryPostgresStorage) FindCounterByName(ctx context.Context, name metric.Name) (delta int64, found bool, err error) {
 	var id string
 	var metricName string

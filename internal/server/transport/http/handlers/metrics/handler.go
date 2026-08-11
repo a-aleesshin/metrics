@@ -1,9 +1,12 @@
+// Package metrics содержит HTTP-хендлеры приёма и выдачи метрик gauge/counter:
+// обновление через URL-параметры и JSON (одиночное и батчевое), чтение значений и HTML-список.
 package metrics
 
 import (
 	"github.com/go-chi/chi/v5"
 )
 
+// Handler объединяет хендлеры метрик и регистрирует их маршруты в роутере chi.
 type Handler struct {
 	update     *UpdateHandler
 	updateJSON *UpdateJsonHandler
@@ -13,6 +16,7 @@ type Handler struct {
 	list       *ListMetricsHandler
 }
 
+// NewHandler создаёт составной хендлер метрик из отдельных хендлеров операций.
 func NewHandler(
 	update *UpdateHandler,
 	updateJSON *UpdateJsonHandler,
@@ -31,6 +35,8 @@ func NewHandler(
 	}
 }
 
+// RegisterRoutes регистрирует маршруты метрик: POST /update, POST /updates,
+// POST /update/{type}/{name}/{value}, POST /value, GET /value/{type}/{name}, GET /.
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Post("/update", h.updateJSON.UpdateJSON)
 	r.Post("/updates", h.updates.Updates)

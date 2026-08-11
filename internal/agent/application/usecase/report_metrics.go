@@ -7,20 +7,26 @@ import (
 	"github.com/a-aleesshin/metrics/internal/agent/application/port/repository"
 )
 
+// MetricSender отправляет метрики на сервер поштучно или батчем.
 type MetricSender interface {
+	// Send отправляет одну метрику.
 	Send(dto dto.MetricDTO) error
+	// SendBatch отправляет пачку метрик одним запросом.
 	SendBatch(metrics []dto.MetricDTO) error
 }
 
+// ReportMetricsUseCase формирует отчёт из репозитория и отправляет его через MetricSender.
 type ReportMetricsUseCase struct {
 	repo   repository.MetricRepository
 	sender MetricSender
 }
 
+// NewReportMetricsUseCase создаёт сценарий отправки метрик.
 func NewReportMetricsUseCase(repo repository.MetricRepository, sender MetricSender) *ReportMetricsUseCase {
 	return &ReportMetricsUseCase{repo: repo, sender: sender}
 }
 
+// BuildMetrics читает снимок метрик из репозитория и конвертирует его в список DTO.
 func (usecase *ReportMetricsUseCase) BuildMetrics() ([]dto.MetricDTO, error) {
 	metrics, err := usecase.repo.GetMetrics()
 
@@ -53,6 +59,7 @@ func (usecase *ReportMetricsUseCase) BuildMetrics() ([]dto.MetricDTO, error) {
 	return batch, nil
 }
 
+// Execute строит отчёт и отправляет его на сервер.
 func (usecase *ReportMetricsUseCase) Execute() error {
 	batch, err := usecase.BuildMetrics()
 	if err != nil {
@@ -62,6 +69,7 @@ func (usecase *ReportMetricsUseCase) Execute() error {
 	return usecase.SendMetrics(batch)
 }
 
+// SendMetrics отправляет готовый батч; пустой батч не отправляется.
 func (usecase *ReportMetricsUseCase) SendMetrics(batch []dto.MetricDTO) error {
 	if len(batch) == 0 {
 		return nil

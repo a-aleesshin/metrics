@@ -11,14 +11,19 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
 )
 
+// ValueJsonHandler отдаёт значение метрики в формате JSON по запросу с JSON-телом.
 type ValueJsonHandler struct {
 	getValueMetric ValueMetricUseCase
 }
 
+// NewValueJsonHandler создаёт хендлер чтения значения метрики через JSON API.
 func NewValueJsonHandler(usecase ValueMetricUseCase) *ValueJsonHandler {
 	return &ValueJsonHandler{getValueMetric: usecase}
 }
 
+// ValueJSON обрабатывает POST /value с JSON-телом Metrics (id и type): возвращает 200
+// и метрику с заполненным Value/Delta; 404 — метрика не найдена, 400 — неверный
+// Content-Type, тело, тип или имя метрики.
 func (h *ValueJsonHandler) ValueJSON(w http.ResponseWriter, r *http.Request) {
 	if !platformhttp.IsJSON(r) {
 		http.Error(w, "invalid content type", http.StatusBadRequest)

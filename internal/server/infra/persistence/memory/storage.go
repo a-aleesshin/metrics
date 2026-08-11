@@ -1,3 +1,4 @@
+// Package memory реализует хранилище метрик в памяти процесса.
 package memory
 
 import (
@@ -20,12 +21,15 @@ type counterRecord struct {
 	Delta int64
 }
 
+// MemStorage — потокобезопасное in-memory хранилище метрик;
+// реализует порты репозиториев чтения, записи, батча и состояния.
 type MemStorage struct {
 	mu      sync.Mutex
 	gauges  map[string]gaugeRecord
 	counter map[string]counterRecord
 }
 
+// NewMemStorage создаёт пустое in-memory хранилище метрик.
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
 		gauges:  make(map[string]gaugeRecord),
@@ -33,6 +37,7 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
+// GetGaugeByName возвращает gauge по имени или nil, если он не найден.
 func (m *MemStorage) GetGaugeByName(ctx context.Context, name metric.Name) (*metric.Gauge, error) {
 	m.mu.Lock()
 	record, ok := m.gauges[string(name)]
@@ -51,6 +56,7 @@ func (m *MemStorage) GetGaugeByName(ctx context.Context, name metric.Name) (*met
 	return gauge, nil
 }
 
+// SaveGauge сохраняет gauge, перезаписывая запись с тем же именем.
 func (m *MemStorage) SaveGauge(ctx context.Context, gauge *metric.Gauge) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -64,6 +70,7 @@ func (m *MemStorage) SaveGauge(ctx context.Context, gauge *metric.Gauge) error {
 	return nil
 }
 
+// GetCounterByName возвращает counter по имени или nil, если он не найден.
 func (m *MemStorage) GetCounterByName(ctx context.Context, name metric.Name) (*metric.Counter, error) {
 	m.mu.Lock()
 	record, ok := m.counter[string(name)]
@@ -82,6 +89,7 @@ func (m *MemStorage) GetCounterByName(ctx context.Context, name metric.Name) (*m
 	return counter, nil
 }
 
+// SaveCounter сохраняет counter, перезаписывая запись с тем же именем.
 func (m *MemStorage) SaveCounter(ctx context.Context, counter *metric.Counter) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -95,6 +103,7 @@ func (m *MemStorage) SaveCounter(ctx context.Context, counter *metric.Counter) e
 	return nil
 }
 
+// ListCounters возвращает все counter-ы без гарантии порядка.
 func (m *MemStorage) ListCounters(ctx context.Context) ([]repository.CounterSnapshot, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -111,6 +120,7 @@ func (m *MemStorage) ListCounters(ctx context.Context) ([]repository.CounterSnap
 	return out, nil
 }
 
+// ListGauges возвращает все gauge без гарантии порядка.
 func (m *MemStorage) ListGauges(ctx context.Context) ([]repository.GaugeSnapshot, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -127,6 +137,7 @@ func (m *MemStorage) ListGauges(ctx context.Context) ([]repository.GaugeSnapshot
 	return out, nil
 }
 
+// FindGaugeByName возвращает значение gauge и флаг его наличия.
 func (m *MemStorage) FindGaugeByName(ctx context.Context, name metric.Name) (value float64, found bool, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -139,6 +150,7 @@ func (m *MemStorage) FindGaugeByName(ctx context.Context, name metric.Name) (val
 	return rec.Value, true, nil
 }
 
+// FindCounterByName возвращает значение counter и флаг его наличия.
 func (m *MemStorage) FindCounterByName(ctx context.Context, name metric.Name) (delta int64, found bool, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -151,6 +163,7 @@ func (m *MemStorage) FindCounterByName(ctx context.Context, name metric.Name) (d
 	return rec.Delta, true, nil
 }
 
+// GetAllMetrics возвращает полное состояние хранилища как доменные объекты.
 func (m *MemStorage) GetAllMetrics(ctx context.Context) (repository.MetricsState, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -183,6 +196,8 @@ func (m *MemStorage) GetAllMetrics(ctx context.Context) (repository.MetricsState
 	return state, nil
 }
 
+// UpdateBatch применяет батч под одной блокировкой:
+// gauge перезаписываются, counter накапливаются.
 func (m *MemStorage) UpdateBatch(ctx context.Context, batch repository.MetricBatch) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

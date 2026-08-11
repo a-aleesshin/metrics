@@ -8,6 +8,8 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
 )
 
+// MetricUpdatesCommand — одна метрика в батч-команде:
+// для gauge обязателен Value, для counter — Delta.
 type MetricUpdatesCommand struct {
 	Name  string
 	MType string
@@ -15,15 +17,18 @@ type MetricUpdatesCommand struct {
 	Value *float64
 }
 
+// UpdatesMetricsCommand — входные данные батч-обновления метрик.
 type UpdatesMetricsCommand struct {
 	Metrics []MetricUpdatesCommand
 }
 
+// UpdatesMetricsUseCase — use case батч-обновления метрик одной операцией репозитория.
 type UpdatesMetricsUseCase struct {
 	idGenerator generator.IDGenerator
 	repository  repository.MetricBatchRepository
 }
 
+// NewUpdatesMetricsUseCase создаёт use case батч-обновления метрик.
 func NewUpdatesMetricsUseCase(
 	repository repository.MetricBatchRepository,
 	idGenerator generator.IDGenerator,
@@ -34,6 +39,8 @@ func NewUpdatesMetricsUseCase(
 	}
 }
 
+// Execute валидирует метрики команды, собирает батч доменных объектов
+// и передаёт его репозиторию; пустой батч не сохраняется.
 func (uc *UpdatesMetricsUseCase) Execute(ctx context.Context, command UpdatesMetricsCommand) error {
 	batch := repository.MetricBatch{
 		Gauges:   make([]*metric.Gauge, 0, len(command.Metrics)),
@@ -69,7 +76,7 @@ func (uc *UpdatesMetricsUseCase) Execute(ctx context.Context, command UpdatesMet
 			if metricItem.Delta == nil {
 				return metric.ErrInvalidMetricValue
 			}
-			
+
 			counter, err := metric.NewCounter(id.String(), name.String(), *metricItem.Delta)
 
 			if err != nil {

@@ -37,6 +37,8 @@ func (rw *responseDataWriter) WriteHeader(statusCode int) {
 	rw.ResponseWriter.WriteHeader(statusCode)
 }
 
+// RequestLogger — middleware, логирующее каждый запрос: URI, метод, длительность,
+// статус и размер ответа.
 func RequestLogger(log *zap.Logger) func(h http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

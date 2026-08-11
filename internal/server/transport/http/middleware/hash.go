@@ -4,12 +4,21 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"sync"
 
 	"github.com/a-aleesshin/metrics/internal/platform/hash"
 )
 
+// HashSHA256Header — имя HTTP-заголовка с подписью HMAC-SHA256 тела запроса/ответа.
 const HashSHA256Header = "HashSHA256"
 
+var hashBufferPool = sync.Pool{
+	New: func() any { return new(bytes.Buffer) },
+}
+
+// WithHashSHA256 — middleware подписи HMAC-SHA256 с ключом key: проверяет подпись
+// тела запроса из заголовка HashSHA256 (при несовпадении — 400) и подписывает тело
+// ответа тем же заголовком. При пустом key middleware отключается.
 func WithHashSHA256(key string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		if key == "" {
@@ -17,12 +26,17 @@ func WithHashSHA256(key string) func(http.Handler) http.Handler {
 		}
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			body, err := io.ReadAll(r.Body)
-			if err != nil {
+			reqBuf := hashBufferPool.Get().(*bytes.Buffer)
+			reqBuf.Reset()
+			defer hashBufferPool.Put(reqBuf)
+
+			if _, err := reqBuf.ReadFrom(r.Body); err != nil {
 				http.Error(w, "read request body", http.StatusBadRequest)
 				return
 			}
 			_ = r.Body.Close()
+
+			body := reqBuf.Bytes()
 
 			if got := r.Header.Get(HashSHA256Header); got != "" && !hash.VerifySHA256(body, key, got) {
 				w.WriteHeader(http.StatusBadRequest)
@@ -32,6 +46,11 @@ func WithHashSHA256(key string) func(http.Handler) http.Handler {
 			r.Body = io.NopCloser(bytes.NewReader(body))
 
 			rec := newHashResponseRecorder(w)
+			defer func() {
+				rec.body.Reset()
+				hashBufferPool.Put(rec.body)
+			}()
+
 			next.ServeHTTP(rec, r)
 
 			for headerName, values := range rec.header {
@@ -50,14 +69,18 @@ func WithHashSHA256(key string) func(http.Handler) http.Handler {
 type hashResponseRecorder struct {
 	writer     http.ResponseWriter
 	header     http.Header
-	body       bytes.Buffer
+	body       *bytes.Buffer
 	statusCode int
 }
 
 func newHashResponseRecorder(w http.ResponseWriter) *hashResponseRecorder {
+	body := hashBufferPool.Get().(*bytes.Buffer)
+	body.Reset()
+
 	return &hashResponseRecorder{
 		writer:     w,
 		header:     make(http.Header),
+		body:       body,
 		statusCode: http.StatusOK,
 	}
 }

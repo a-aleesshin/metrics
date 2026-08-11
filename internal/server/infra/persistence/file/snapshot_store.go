@@ -1,3 +1,4 @@
+// Package file реализует snapshot-хранилище метрик в JSON-файле.
 package file
 
 import (
@@ -14,11 +15,14 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
 )
 
+// SnapshotStore — файловое snapshot-хранилище метрик;
+// запись атомарна: через временный файл и rename.
 type SnapshotStore struct {
 	path string
 	mu   sync.Mutex
 }
 
+// NewSnapshotStore создаёт файловое snapshot-хранилище; пустой путь — ошибка.
 func NewSnapshotStore(path string) (*SnapshotStore, error) {
 	if strings.TrimSpace(path) == "" {
 		return nil, errors.New("snapshot path is empty")
@@ -29,6 +33,8 @@ func NewSnapshotStore(path string) (*SnapshotStore, error) {
 	}, nil
 }
 
+// Save валидирует snapshot-ы и атомарно записывает их в JSON-файл,
+// создавая каталог при необходимости.
 func (ss *SnapshotStore) Save(ctx context.Context, metrics []repository.MetricSnapshot) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
@@ -82,6 +88,8 @@ func (ss *SnapshotStore) Save(ctx context.Context, metrics []repository.MetricSn
 	return nil
 }
 
+// Load читает и валидирует snapshot-ы из файла;
+// отсутствие или пустой файл — пустой срез без ошибки.
 func (ss *SnapshotStore) Load(ctx context.Context) ([]repository.MetricSnapshot, error) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()

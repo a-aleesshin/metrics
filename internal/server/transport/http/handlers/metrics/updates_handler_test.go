@@ -129,7 +129,7 @@ func TestUpdatesHandler_Updates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
 			useCaseSpy := &updatesMetricsUseCaseSpy{err: tt.useCaseErr}
-			handler := NewUpdatesHandler(useCaseSpy)
+			handler := NewUpdatesHandler(useCaseSpy, nil)
 
 			r := chi.NewRouter()
 			r.Post("/updates", handler.Updates)

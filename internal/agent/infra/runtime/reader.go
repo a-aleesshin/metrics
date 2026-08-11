@@ -1,3 +1,4 @@
+// Package runtimeadapter читает метрики Go runtime из runtime.MemStats.
 package runtimeadapter
 
 import (
@@ -6,13 +7,16 @@ import (
 	"github.com/a-aleesshin/metrics/internal/agent/application/port/reader"
 )
 
+// MetricRuntimeReader — реализация RuntimeReader поверх runtime.ReadMemStats.
 type MetricRuntimeReader struct {
 }
 
+// NewMetricRuntimeReader создаёт читатель runtime-метрик.
 func NewMetricRuntimeReader() *MetricRuntimeReader {
 	return &MetricRuntimeReader{}
 }
 
+// Read снимает runtime.MemStats и возвращает фиксированный набор метрик памяти и GC.
 func (m *MetricRuntimeReader) Read() []reader.RuntimeMetric {
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)

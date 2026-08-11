@@ -1,3 +1,4 @@
+// Package httperror отображает доменные ошибки метрик на HTTP-статусы ответа.
 package httperror
 
 import (
@@ -7,6 +8,8 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/domain/metric"
 )
 
+// WriteError пишет HTTP-статус по доменной ошибке: 404 — пустое имя метрики,
+// 400 — неверный тип или значение, 500 — прочие ошибки.
 func WriteError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, metric.ErrNameEmpty):

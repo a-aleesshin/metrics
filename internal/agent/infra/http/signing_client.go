@@ -9,13 +9,16 @@ import (
 	"github.com/a-aleesshin/metrics/internal/platform/hash"
 )
 
+// HashSHA256Header — имя HTTP-заголовка с HMAC-SHA256 подписью тела запроса.
 const HashSHA256Header = "HashSHA256"
 
+// SigningClient — декоратор HTTPClient, подписывающий тело запроса HMAC-SHA256 с ключом key.
 type SigningClient struct {
 	client HTTPClient
 	key    string
 }
 
+// NewSigningClient создаёт SigningClient; при nil client используется http.DefaultClient.
 func NewSigningClient(client HTTPClient, key string) *SigningClient {
 	if client == nil {
 		client = http.DefaultClient
@@ -27,6 +30,8 @@ func NewSigningClient(client HTTPClient, key string) *SigningClient {
 	}
 }
 
+// Do добавляет заголовок HashSHA256 с подписью тела и выполняет запрос;
+// при пустом ключе запрос проходит без подписи.
 func (c *SigningClient) Do(request *http.Request) (*http.Response, error) {
 	if c.key == "" {
 		return c.client.Do(request)

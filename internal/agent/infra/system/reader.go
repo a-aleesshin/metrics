@@ -1,3 +1,4 @@
+// Package systemadapter читает системные метрики (память, CPU) через gopsutil.
 package systemadapter
 
 import (
@@ -12,11 +13,13 @@ import (
 type virtualMemoryReader func() (*mem.VirtualMemoryStat, error)
 type cpuPercentReader func(interval time.Duration, percpu bool) ([]float64, error)
 
+// GopsutilReader — реализация SystemReader поверх gopsutil (mem.VirtualMemory, cpu.Percent).
 type GopsutilReader struct {
 	virtualMemory virtualMemoryReader
 	cpuPercent    cpuPercentReader
 }
 
+// NewGopsutilReader создаёт читатель системных метрик на реальных функциях gopsutil.
 func NewGopsutilReader() *GopsutilReader {
 	return newGopsutilReader(mem.VirtualMemory, cpu.Percent)
 }
@@ -28,6 +31,7 @@ func newGopsutilReader(virtualMemory virtualMemoryReader, cpuPercent cpuPercentR
 	}
 }
 
+// Read возвращает TotalMemory, FreeMemory и CPUutilizationN для каждого ядра.
 func (r *GopsutilReader) Read() ([]reader.SystemMetric, error) {
 	memoryStats, err := r.virtualMemory()
 	if err != nil {

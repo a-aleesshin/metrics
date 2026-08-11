@@ -1,3 +1,5 @@
+// Package runner запускает жизненный цикл агента: периодический сбор метрик
+// и их отправку пулом воркеров.
 package runner
 
 import (
@@ -9,15 +11,21 @@ import (
 	portlogger "github.com/a-aleesshin/metrics/internal/shared/port/logger"
 )
 
+// CollectMetricsExecutor — сценарий одного цикла сбора метрик.
 type CollectMetricsExecutor interface {
+	// Execute выполняет один цикл сбора метрик.
 	Execute() error
 }
 
+// ReportMetricsExecutor — сценарий формирования и отправки отчёта о метриках.
 type ReportMetricsExecutor interface {
+	// BuildMetrics формирует список метрик для отправки.
 	BuildMetrics() ([]dto.MetricDTO, error)
+	// SendMetrics отправляет подготовленный список метрик.
 	SendMetrics(metrics []dto.MetricDTO) error
 }
 
+// AgentRunner координирует горутины сбора и отправки метрик по расписанию.
 type AgentRunner struct {
 	collectUseCase       CollectMetricsExecutor
 	collectSystemUseCase CollectMetricsExecutor
@@ -28,6 +36,7 @@ type AgentRunner struct {
 	logger               portlogger.Logger
 }
 
+// NewAgentRunner создаёт раннер агента; rateLimit <= 0 приводится к 1.
 func NewAgentRunner(
 	collectUseCase CollectMetricsExecutor,
 	collectSystemUseCase CollectMetricsExecutor,
@@ -52,6 +61,7 @@ func NewAgentRunner(
 	}
 }
 
+// Run запускает сборщики и rateLimit воркеров отправки; блокируется до отмены ctx.
 func (r *AgentRunner) Run(ctx context.Context) error {
 	jobs := make(chan []dto.MetricDTO)
 	var wg sync.WaitGroup

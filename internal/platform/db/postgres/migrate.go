@@ -9,6 +9,8 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
+// Migrate применяет SQL-миграции из каталога migrationsPath к базе по dsn;
+// отсутствие новых миграций ошибкой не считается.
 func Migrate(dsn string, migrationsPath string) error {
 	m, err := migrate.New(
 		"file://"+migrationsPath,

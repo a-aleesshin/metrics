@@ -9,12 +9,14 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/application/port/repository"
 )
 
+// SaveMetricSnapshotUseCase — use case сохранения текущего состояния метрик в snapshot-хранилище.
 type SaveMetricSnapshotUseCase struct {
 	repositoryState    repository.MetricStateRepository
 	repositorySnapshot repository.MetricSnapshotStore
 	mapper             *mapper.MetricSnapshotMapper
 }
 
+// NewSaveMetricSnapshotUseCase создаёт use case сохранения snapshot метрик.
 func NewSaveMetricSnapshotUseCase(repositoryState repository.MetricStateRepository, repositorySnapshot repository.MetricSnapshotStore, mapper *mapper.MetricSnapshotMapper) *SaveMetricSnapshotUseCase {
 	return &SaveMetricSnapshotUseCase{
 		repositoryState:    repositoryState,
@@ -23,6 +25,8 @@ func NewSaveMetricSnapshotUseCase(repositoryState repository.MetricStateReposito
 	}
 }
 
+// Execute читает все метрики, конвертирует их в snapshot-ы,
+// сортирует по типу и ID и записывает в snapshot-хранилище.
 func (u *SaveMetricSnapshotUseCase) Execute(ctx context.Context) error {
 	metrics, err := u.repositoryState.GetAllMetrics(ctx)
 

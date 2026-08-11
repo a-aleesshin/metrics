@@ -1,3 +1,4 @@
+// Package cli загружает конфигурацию агента из флагов командной строки и переменных окружения.
 package cli
 
 import (
@@ -8,6 +9,7 @@ import (
 	"time"
 )
 
+// AgentConfig — параметры запуска агента: адрес сервера, интервалы, ключ подписи и лимит воркеров.
 type AgentConfig struct {
 	Address        string `env:"ADDRESS"`
 	ReportInterval time.Duration
@@ -24,6 +26,8 @@ var (
 	rateLimitDefault      = 1
 )
 
+// LoadConfig разбирает флаги args и переменные окружения;
+// значения из окружения имеют приоритет над флагами.
 func LoadConfig(args []string) (*AgentConfig, error) {
 	var config AgentConfig
 
