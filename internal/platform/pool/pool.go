@@ -12,7 +12,7 @@ type Resettable interface {
 	Reset()
 }
 
-// Pool типобезопасный пул объектов типа T поверх sync.Pool.
+// Pool — типобезопасный пул объектов типа T поверх sync.Pool.
 // Put сбрасывает объект методом Reset() перед возвратом в пул,
 // поэтому Get всегда отдаёт объект в начальном состоянии.
 type Pool[T Resettable] struct {
@@ -35,6 +35,7 @@ func (p *Pool[T]) Get() T {
 }
 
 // Put сбрасывает состояние объекта вызовом Reset() и возвращает его в пул.
+// После Put объект использовать нельзя — им владеет пул.
 func (p *Pool[T]) Put(value T) {
 	value.Reset()
 	p.pool.Put(value)

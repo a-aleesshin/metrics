@@ -133,3 +133,30 @@ Dropped 76 nodes (cum <= 263.78MB)
          0     0% 93.62% -23183.15MB 43.94%  github.com/a-aleesshin/metrics/internal/agent/application/usecase.(*ReportMetricsUseCase).Execute
          0     0% 93.62% -23246.70MB 44.07%  github.com/a-aleesshin/metrics/internal/agent/application/usecase.(*ReportMetricsUseCase).SendMetrics
 ```
+## Инструменты проекта
+
+### Статический анализ (cmd/staticlint)
+
+Собственный multichecker: стандартные анализаторы `x/tools/passes`, все `SA`
+и выборочные `S`/`ST`/`QF` из staticcheck, публичные `bodyclose` и `nilerr`,
+плюс собственный `osexit` — запрет прямого вызова `os.Exit` в `main` пакета
+`main`. Подробное описание каждого анализатора — в godoc пакета.
+
+```
+go run ./cmd/staticlint ./...
+```
+
+Проект проходит анализ без замечаний; ненулевой код выхода означает находки.
+
+### Генератор Reset-методов (cmd/reset)
+
+Утилита сканирует пакеты модуля и для структур, помеченных комментарием
+`// generate:reset`, генерирует методы `Reset()` в файл `reset.gen.go` пакета
+(примитивы — к нулю, слайсы — `s[:0]`, мапы — `clear`, вложенные структуры —
+вызов их `Reset()`). Используется пулом объектов `internal/platform/pool`:
+`Put` сбрасывает объект перед возвратом, поэтому из `Get` всегда приходит
+чистый объект.
+
+```
+go run ./cmd/reset
+```
