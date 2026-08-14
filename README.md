@@ -135,18 +135,24 @@ Dropped 76 nodes (cum <= 263.78MB)
 ```
 ## Инструменты проекта
 
-### Статический анализ (cmd/staticlint)
+### Статический анализ (cmd/staticlint, cmd/multichecker)
 
-Собственный multichecker: стандартные анализаторы `x/tools/passes`, все `SA`
-и выборочные `S`/`ST`/`QF` из staticcheck, публичные `bodyclose` и `nilerr`,
-плюс собственный `osexit` — запрет прямого вызова `os.Exit` в `main` пакета
-`main`. Подробное описание каждого анализатора — в godoc пакета.
+`cmd/staticlint` — singlechecker с собственным анализатором `osexit`:
+запрет прямого вызова `os.Exit` в `main` пакета `main`.
 
 ```
 go run ./cmd/staticlint ./...
 ```
 
-Проект проходит анализ без замечаний; ненулевой код выхода означает находки.
+`cmd/multichecker` — расширенный набор: стандартные анализаторы
+`x/tools/passes`, все `SA` и выборочные `S`/`ST`/`QF` из staticcheck,
+публичные `bodyclose` и `nilerr`, плюс собственные `osexit` и `nopanic`
+(сообщает об использовании встроенной функции `panic`). Подробное описание
+каждого анализатора — в godoc пакета.
+
+```
+go run ./cmd/multichecker ./...
+```
 
 ### Генератор Reset-методов (cmd/reset)
 
@@ -160,3 +166,28 @@ go run ./cmd/staticlint ./...
 ```
 go run ./cmd/reset
 ```
+
+### Сборка с информацией о версии
+
+Сервер и агент при старте печатают версию, дату и коммит сборки:
+
+```
+Build version: <buildVersion>
+Build date: <buildDate>
+Build commit: <buildCommit>
+```
+
+Значения задаются на этапе сборки через `-ldflags -X` для глобальных
+переменных `main.buildVersion`, `main.buildDate` и `main.buildCommit`
+пакетов `cmd/server` и `cmd/agent`:
+
+```
+go build -ldflags "-X main.buildVersion=v1.0.0 -X main.buildDate=$(date +%Y-%m-%d) -X main.buildCommit=$(git rev-parse --short HEAD)" -o server ./cmd/server
+```
+
+```
+go build -ldflags "-X main.buildVersion=v1.0.0 -X main.buildDate=$(date +%Y-%m-%d) -X main.buildCommit=$(git rev-parse --short HEAD)" -o agent ./cmd/agent
+```
+
+Если собрать без `-ldflags` (например, обычным `go build ./cmd/server`),
+вместо незаданных значений будет напечатано `N/A`.

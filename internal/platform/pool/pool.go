@@ -19,19 +19,29 @@ type Pool[T Resettable] struct {
 	pool sync.Pool
 }
 
-// New создаёт пул для типа T, factory вызывается, когда пул пуст
-// и нужен новый объект.
+// New создаёт пул для типа T. Фабрика опциональна, если factory задана,
+// она вызывается, когда пул пуст и нужен новый объект, при factory = nil
+// пустой пул возвращает из Get нулевое значение типа T.
 func New[T Resettable](factory func() T) *Pool[T] {
-	return &Pool[T]{
-		pool: sync.Pool{
-			New: func() any { return factory() },
-		},
+	p := &Pool[T]{}
+
+	if factory != nil {
+		p.pool.New = func() any { return factory() }
 	}
+
+	return p
 }
 
-// Get возвращает объект из пула или, если пул пуст, создаёт новый через factory.
+// Get возвращает объект из пула, если пул пуст то новый объект от factory,
+// а при не заданной factory, нулевое значение типа T.
 func (p *Pool[T]) Get() T {
-	return p.pool.Get().(T)
+	value, ok := p.pool.Get().(T)
+	if !ok {
+		var zero T
+		return zero
+	}
+
+	return value
 }
 
 // Put сбрасывает состояние объекта вызовом Reset() и возвращает его в пул.

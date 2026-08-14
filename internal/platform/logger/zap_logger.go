@@ -11,10 +11,11 @@ type ZapLogger struct {
 	logger *zap.Logger
 }
 
-// NewZapLogger оборачивает базовый zap-логгер; при nil base паникует.
+// NewZapLogger оборачивает базовый zap-логгер; при nil base используется
+// no-op логгер, чтобы адаптер оставался безопасным в использовании.
 func NewZapLogger(base *zap.Logger) *ZapLogger {
 	if base == nil {
-		panic("logger: base zap logger is nil")
+		base = zap.NewNop()
 	}
 
 	return &ZapLogger{

@@ -26,6 +26,26 @@ func TestPool_GetUsesFactoryWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestPool_NilFactoryReturnsZeroValue(t *testing.T) {
+	p := pool.New[*resettest.Container](nil)
+
+	if got := p.Get(); got != nil {
+		t.Fatalf("expected zero value (nil) from empty pool without factory, got %+v", got)
+	}
+
+	// Возвращённые в пул объекты переиспользуются и без фабрики.
+	p.Put(&resettest.Container{Num: 42})
+
+	got := p.Get()
+	if got == nil {
+		t.Fatal("expected pooled object after Put, got nil")
+	}
+
+	if got.Num != 0 {
+		t.Fatalf("expected object reset on Put, got Num=%d", got.Num)
+	}
+}
+
 func TestPool_PutResetsObject(t *testing.T) {
 	p := pool.New(func() *resettest.Container {
 		return &resettest.Container{}
