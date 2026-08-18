@@ -15,6 +15,19 @@ var defaultDelays = []time.Duration{
 // IsRetriableFunc решает, стоит ли повторять операцию после данной ошибки.
 type IsRetriableFunc func(error) bool
 
+// DefaultDelays возвращает копию задержек по умолчанию (1s, 3s, 5s).
+func DefaultDelays() []time.Duration {
+	out := make([]time.Duration, len(defaultDelays))
+	copy(out, defaultDelays)
+
+	return out
+}
+
+// Wait ждёт delay или отмену ctx; при отмене возвращает ctx.Err().
+func Wait(ctx context.Context, delay time.Duration) error {
+	return sleep(ctx, delay)
+}
+
 // Do выполняет operation с задержками по умолчанию (1s, 3s, 5s) между повторами.
 func Do(ctx context.Context, isRetriable IsRetriableFunc, operation func() error) error {
 	return DoWithDelays(ctx, defaultDelays, isRetriable, operation)

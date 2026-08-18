@@ -11,6 +11,9 @@ import (
 )
 
 // Event — событие аудита: unix-время, имена изменённых метрик и IP-адрес клиента.
+// Метод Reset() генерируется утилитой cmd/reset (go run ./cmd/reset).
+//
+// generate:reset
 type Event struct {
 	TS        int64    `json:"ts"`
 	Metrics   []string `json:"metrics"`
