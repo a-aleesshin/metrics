@@ -17,17 +17,16 @@ const defaultTimeout = 5 * time.Second
 // HTTPObserver отправляет события аудита POST-запросом с JSON-телом на заданный URL.
 type HTTPObserver struct {
 	url    string
-	client *http.Client
+	client httpDoer
 }
 
 // NewHTTPObserver создаёт наблюдателя, отправляющего события на url.
-// При client == nil используется http.Client с таймаутом 5 секунд.
 func NewHTTPObserver(url string, client *http.Client) *HTTPObserver {
 	if client == nil {
 		client = &http.Client{Timeout: defaultTimeout}
 	}
 
-	return &HTTPObserver{url: url, client: client}
+	return &HTTPObserver{url: url, client: newRetryHTTPClient(client, nil)}
 }
 
 // Notify отправляет событие POST-запросом с Content-Type: application/json.

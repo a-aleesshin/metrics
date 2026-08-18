@@ -42,7 +42,15 @@ func (c *RetryClient) Do(request *http.Request) (*http.Response, error) {
 		delays = retry.DefaultDelays()
 	}
 
-	for attempt := 0; ; attempt++ {
+	var lastErr error
+
+	for attempt := 0; attempt <= len(delays); attempt++ {
+		if attempt > 0 {
+			if waitErr := retry.Wait(request.Context(), delays[attempt-1]); waitErr != nil {
+				return nil, waitErr
+			}
+		}
+
 		retryRequest, err := cloneRequest(request)
 		if err != nil {
 			return nil, err
@@ -53,14 +61,14 @@ func (c *RetryClient) Do(request *http.Request) (*http.Response, error) {
 			return response, nil
 		}
 
-		if !isRetriableHTTPError(err) || attempt >= len(delays) {
+		if !isRetriableHTTPError(err) {
 			return nil, err
 		}
 
-		if waitErr := retry.Wait(request.Context(), delays[attempt]); waitErr != nil {
-			return nil, waitErr
-		}
+		lastErr = err
 	}
+
+	return nil, lastErr
 }
 
 func cloneRequest(request *http.Request) (*http.Request, error) {

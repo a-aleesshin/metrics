@@ -125,9 +125,8 @@ func BenchmarkHTTP_UpdatePlain(b *testing.B) {
 	handler, _ := newBenchServer(b)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		req := httptest.NewRequest(http.MethodPost, "/update/gauge/Alloc/123.45", nil)
 		serve(b, handler, req, http.StatusOK)
 	}
@@ -140,9 +139,8 @@ func BenchmarkHTTP_UpdateJSON(b *testing.B) {
 	body := mustJSON(b, metricsPayload{ID: "Alloc", MType: "gauge", Value: &value})
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		req := httptest.NewRequest(http.MethodPost, "/update", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept-Encoding", "gzip")
@@ -172,9 +170,8 @@ func BenchmarkHTTP_UpdatesBatch(b *testing.B) {
 	body := mustJSON(b, payload)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		req := httptest.NewRequest(http.MethodPost, "/updates", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept-Encoding", "gzip")
@@ -190,9 +187,8 @@ func BenchmarkHTTP_ValueJSON(b *testing.B) {
 	body := mustJSON(b, metricsPayload{ID: "Gauge1", MType: "gauge"})
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		req := httptest.NewRequest(http.MethodPost, "/value", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept-Encoding", "gzip")
@@ -206,9 +202,8 @@ func BenchmarkHTTP_List(b *testing.B) {
 	seedStorage(b, storage, 100, 50)
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Set("Accept-Encoding", "gzip")
 
@@ -242,9 +237,8 @@ func BenchmarkMemStorage_UpdateBatch(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := storage.UpdateBatch(ctx, batch); err != nil {
 			b.Fatalf("update batch: %v", err)
 		}
@@ -261,9 +255,8 @@ func BenchmarkAuditPublisher_Publish(b *testing.B) {
 	names := []string{"Alloc", "Frees", "HeapAlloc", "PollCount"}
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		publisher.Publish(ctx, names, "192.168.0.42")
 	}
 }

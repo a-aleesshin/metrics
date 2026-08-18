@@ -23,11 +23,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// Информация о сборке, значения подставляются при сборке через
+// Информация о сборке. Значения по умолчанию перезаписываются на этапе
+// компиляции через ldflags -X (main.buildVersion, main.buildDate, main.buildCommit).
 var (
-	buildVersion string
-	buildDate    string
-	buildCommit  string
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
 )
 
 func main() {

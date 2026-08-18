@@ -1,5 +1,5 @@
 // Package buildinfo печатает информацию о сборке бинарника: версию, дату
-// и коммит
+// и коммит. Значения задаются при сборке через ldflags, например:
 //
 //	go build -ldflags "-X main.buildVersion=v1.0.0 \
 //	  -X main.buildDate=2026-08-09 \

@@ -47,6 +47,32 @@ git fetch template && git checkout template/v2 .github
 
 Бенчмарки компонентов лежат в `internal/server/bench`
 
+Базовый профиль (`profiles/base.pprof`) показал три источника лишних аллокаций:
+
+- `gzip.NewWriter` в compress-middleware создавался на каждый ответ — это ~88%
+  всего alloc_space: writer держит ~800 КБ внутренних буферов flate, которые
+  выделялись и выбрасывались на каждом запросе ради сжатия десятков байт JSON;
+- hash-middleware на каждый запрос читал тело через `io.ReadAll` и заводил
+  новый `bytes.Buffer` под буферизацию ответа;
+- list-хендлер парсил HTML-шаблон страницы метрик на каждый запрос
+  (~3000 allocs/op у `BenchmarkHTTP_List`).
+
+Оптимизации: `sync.Pool` для `gzip.Writer`/`gzip.Reader` с `Reset()` вместо
+создания новых, пул буферов в hash-middleware, разовый парсинг шаблона
+при старте пакета.
+
+До и после (на операцию):
+
+| Бенчмарк | До | После |
+|---|---|---|
+| HTTP_UpdateJSON | 826016 B/op, 94 allocs | 13169 B/op, 72 allocs |
+| HTTP_UpdatesBatch | 831849 B/op, 271 allocs | 29606 B/op, 252 allocs |
+| HTTP_List | 912381 B/op, 3013 allocs | 83117 B/op, 2853 allocs |
+
+По изменениям профилей аллокации сократились на ~75 ГБ за запуск (−87% alloc_space):
+`flate.NewWriter` + `initDeflate` дали −74.7 ГБ, `io.ReadAll` в hash-middleware
+−530 МБ, путь `template.Execute` в list-хендлере −3.5 ГБ.
+
 Итог сравнения профилей (`pprof -top -diff_base=profiles/base.pprof profiles/result.pprof`):
 
 ```
@@ -107,3 +133,61 @@ Dropped 76 nodes (cum <= 263.78MB)
          0     0% 93.62% -23183.15MB 43.94%  github.com/a-aleesshin/metrics/internal/agent/application/usecase.(*ReportMetricsUseCase).Execute
          0     0% 93.62% -23246.70MB 44.07%  github.com/a-aleesshin/metrics/internal/agent/application/usecase.(*ReportMetricsUseCase).SendMetrics
 ```
+## Инструменты проекта
+
+### Статический анализ (cmd/staticlint, cmd/multichecker)
+
+`cmd/staticlint` — singlechecker с собственным анализатором `osexit`:
+запрет прямого вызова `os.Exit` в `main` пакета `main`.
+
+```
+go run ./cmd/staticlint ./...
+```
+
+`cmd/multichecker` — расширенный набор: стандартные анализаторы
+`x/tools/passes`, все `SA` и выборочные `S`/`ST`/`QF` из staticcheck,
+публичные `bodyclose` и `nilerr`, плюс собственные `osexit` и `nopanic`
+(сообщает об использовании встроенной функции `panic`). Подробное описание
+каждого анализатора — в godoc пакета.
+
+```
+go run ./cmd/multichecker ./...
+```
+
+### Генератор Reset-методов (cmd/reset)
+
+Утилита сканирует пакеты модуля и для структур, помеченных комментарием
+`// generate:reset`, генерирует методы `Reset()` в файл `reset.gen.go` пакета
+(примитивы — к нулю, слайсы — `s[:0]`, мапы — `clear`, вложенные структуры —
+вызов их `Reset()`). Используется пулом объектов `internal/platform/pool`:
+`Put` сбрасывает объект перед возвратом, поэтому из `Get` всегда приходит
+чистый объект.
+
+```
+go run ./cmd/reset
+```
+
+### Сборка с информацией о версии
+
+Сервер и агент при старте печатают версию, дату и коммит сборки:
+
+```
+Build version: <buildVersion>
+Build date: <buildDate>
+Build commit: <buildCommit>
+```
+
+Значения задаются на этапе сборки через `-ldflags -X` для глобальных
+переменных `main.buildVersion`, `main.buildDate` и `main.buildCommit`
+пакетов `cmd/server` и `cmd/agent`:
+
+```
+go build -ldflags "-X main.buildVersion=v1.0.0 -X main.buildDate=$(date +%Y-%m-%d) -X main.buildCommit=$(git rev-parse --short HEAD)" -o server ./cmd/server
+```
+
+```
+go build -ldflags "-X main.buildVersion=v1.0.0 -X main.buildDate=$(date +%Y-%m-%d) -X main.buildCommit=$(git rev-parse --short HEAD)" -o agent ./cmd/agent
+```
+
+Если собрать без `-ldflags` (например, обычным `go build ./cmd/server`),
+вместо незаданных значений будет напечатано `N/A`.
