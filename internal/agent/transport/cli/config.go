@@ -178,7 +178,11 @@ func durationSeconds(value, field string) (int, error) {
 		return 0, fmt.Errorf("config file: parse %s: %w", field, err)
 	}
 
-	return int(duration.Seconds()), nil
+	if duration <= 0 || duration%time.Second != 0 {
+		return 0, fmt.Errorf("config file: %s must be a positive whole number of seconds, got %q", field, value)
+	}
+
+	return int(duration / time.Second), nil
 }
 
 func getOptionalStringValue(flagValue *string, envName string) string {

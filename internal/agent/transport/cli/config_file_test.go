@@ -131,3 +131,26 @@ func TestLoadConfig_MissingConfigFile(t *testing.T) {
 		t.Fatal("expected error for missing config file")
 	}
 }
+
+func TestLoadConfig_FractionalIntervalRejected(t *testing.T) {
+	clearAgentEnv(t)
+
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "sub-second report interval", body: `{"report_interval": "500ms"}`},
+		{name: "fractional report interval", body: `{"report_interval": "1500ms"}`},
+		{name: "fractional poll interval", body: `{"poll_interval": "1.5s"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeAgentConfigFile(t, tt.body)
+
+			if _, err := LoadConfig([]string{"-c", path}); err == nil {
+				t.Fatalf("expected error for %s, got nil", tt.body)
+			}
+		})
+	}
+}

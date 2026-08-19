@@ -106,30 +106,24 @@ loop:
 		}
 	}
 
+	if metrics := r.buildFinalReport(); len(metrics) > 0 {
+		jobs <- metrics
+	}
+
 	close(jobs)
 	wg.Wait()
-
-	r.reportFinal()
 
 	return nil
 }
 
-// reportFinal синхронно отправляет текущее состояние метрик; ошибки логируются,
-// но не прерывают завершение.
-func (r *AgentRunner) reportFinal() {
+func (r *AgentRunner) buildFinalReport() []dto.MetricDTO {
 	metrics, err := r.reportUseCase.BuildMetrics()
 	if err != nil {
 		r.logger.Error("build final metrics report failed", portlogger.Err(err))
-		return
+		return nil
 	}
 
-	if len(metrics) == 0 {
-		return
-	}
-
-	if err := r.reportUseCase.SendMetrics(metrics); err != nil {
-		r.logger.Error("send final metrics report failed", portlogger.Err(err))
-	}
+	return metrics
 }
 
 func (r *AgentRunner) runCollector(ctx context.Context, wg *sync.WaitGroup) {

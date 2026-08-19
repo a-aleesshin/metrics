@@ -159,57 +159,57 @@ func applyFileConfig(path string, raw *rawServerConfig, source *rawServerConfigS
 		return fmt.Errorf("parse config file %s: %w", path, err)
 	}
 
-	if source.Address == ValueSourceDefault && file.Address != "" {
-		raw.Address = file.Address
-		source.Address = ValueSourceFile
-	}
-
 	if source.StoreInterval == ValueSourceDefault && file.StoreInterval != "" {
-		interval, err := time.ParseDuration(file.StoreInterval)
+		seconds, err := parseStoreInterval(path, file.StoreInterval)
 		if err != nil {
-			return fmt.Errorf("config file %s: parse store_interval: %w", path, err)
+			return err
 		}
 
-		raw.StoreInterval = int(interval.Seconds())
+		raw.StoreInterval = seconds
 		source.StoreInterval = ValueSourceFile
 	}
 
-	if source.FileStoragePath == ValueSourceDefault && file.StoreFile != "" {
-		raw.FileStoragePath = file.StoreFile
-		source.FileStoragePath = ValueSourceFile
-	}
-
-	if source.Restore == ValueSourceDefault && file.Restore != nil {
-		raw.Restore = *file.Restore
-		source.Restore = ValueSourceFile
-	}
-
-	if source.Postgres == ValueSourceDefault && file.DatabaseDSN != "" {
-		raw.Postgres = file.DatabaseDSN
-		source.Postgres = ValueSourceFile
-	}
-
-	if source.KeySignature == ValueSourceDefault && file.Key != "" {
-		raw.KeySignature = file.Key
-		source.KeySignature = ValueSourceFile
-	}
-
-	if source.AuditFile == ValueSourceDefault && file.AuditFile != "" {
-		raw.AuditFile = file.AuditFile
-		source.AuditFile = ValueSourceFile
-	}
-
-	if source.AuditURL == ValueSourceDefault && file.AuditURL != "" {
-		raw.AuditURL = file.AuditURL
-		source.AuditURL = ValueSourceFile
-	}
-
-	if source.CryptoKey == ValueSourceDefault && file.CryptoKey != "" {
-		raw.CryptoKey = file.CryptoKey
-		source.CryptoKey = ValueSourceFile
-	}
+	applyFileString(&source.Address, &raw.Address, file.Address)
+	applyFileString(&source.FileStoragePath, &raw.FileStoragePath, file.StoreFile)
+	applyFileString(&source.Postgres, &raw.Postgres, file.DatabaseDSN)
+	applyFileString(&source.KeySignature, &raw.KeySignature, file.Key)
+	applyFileString(&source.AuditFile, &raw.AuditFile, file.AuditFile)
+	applyFileString(&source.AuditURL, &raw.AuditURL, file.AuditURL)
+	applyFileString(&source.CryptoKey, &raw.CryptoKey, file.CryptoKey)
+	applyFileBool(&source.Restore, &raw.Restore, file.Restore)
 
 	return nil
+}
+
+func applyFileString(source *ValueSource, dst *string, value string) {
+	if *source != ValueSourceDefault || value == "" {
+		return
+	}
+
+	*dst = value
+	*source = ValueSourceFile
+}
+
+func applyFileBool(source *ValueSource, dst *bool, value *bool) {
+	if *source != ValueSourceDefault || value == nil {
+		return
+	}
+
+	*dst = *value
+	*source = ValueSourceFile
+}
+
+func parseStoreInterval(path, value string) (int, error) {
+	interval, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, fmt.Errorf("config file %s: parse store_interval: %w", path, err)
+	}
+
+	if interval < 0 || interval%time.Second != 0 {
+		return 0, fmt.Errorf("config file %s: store_interval must be a whole number of seconds, got %q", path, value)
+	}
+
+	return int(interval / time.Second), nil
 }
 
 func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, args []string) (string, error) {
@@ -259,42 +259,25 @@ func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, ar
 	return configPath, nil
 }
 
+// markEnvSources помечает источником env параметры, заданные переменными
+// окружения. Правило единое для всех переменных: пустое значение считается
+// не заданным и источник не меняет.
 func markEnvSources(sources *rawServerConfigSource) {
-	if _, ok := os.LookupEnv("ADDRESS"); ok {
-		sources.Address = ValueSourceEnv
+	markEnv := func(name string, source *ValueSource) {
+		if value, ok := os.LookupEnv(name); ok && value != "" {
+			*source = ValueSourceEnv
+		}
 	}
 
-	if _, ok := os.LookupEnv("STORE_INTERVAL"); ok {
-		sources.StoreInterval = ValueSourceEnv
-	}
-
-	if value, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok && value != "" {
-		sources.FileStoragePath = ValueSourceEnv
-	}
-
-	if _, ok := os.LookupEnv("RESTORE"); ok {
-		sources.Restore = ValueSourceEnv
-	}
-
-	if value, ok := os.LookupEnv("DATABASE_DSN"); ok && value != "" {
-		sources.Postgres = ValueSourceEnv
-	}
-
-	if _, ok := os.LookupEnv("KEY"); ok {
-		sources.KeySignature = ValueSourceEnv
-	}
-
-	if value, ok := os.LookupEnv("AUDIT_FILE"); ok && value != "" {
-		sources.AuditFile = ValueSourceEnv
-	}
-
-	if value, ok := os.LookupEnv("AUDIT_URL"); ok && value != "" {
-		sources.AuditURL = ValueSourceEnv
-	}
-
-	if value, ok := os.LookupEnv("CRYPTO_KEY"); ok && value != "" {
-		sources.CryptoKey = ValueSourceEnv
-	}
+	markEnv("ADDRESS", &sources.Address)
+	markEnv("STORE_INTERVAL", &sources.StoreInterval)
+	markEnv("FILE_STORAGE_PATH", &sources.FileStoragePath)
+	markEnv("RESTORE", &sources.Restore)
+	markEnv("DATABASE_DSN", &sources.Postgres)
+	markEnv("KEY", &sources.KeySignature)
+	markEnv("AUDIT_FILE", &sources.AuditFile)
+	markEnv("AUDIT_URL", &sources.AuditURL)
+	markEnv("CRYPTO_KEY", &sources.CryptoKey)
 }
 
 func buildServerConfig(raw *rawServerConfig, source *rawServerConfigSource) (*ServerConfig, error) {

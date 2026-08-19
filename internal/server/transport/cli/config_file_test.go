@@ -125,3 +125,18 @@ func TestLoadConfig_MissingConfigFile(t *testing.T) {
 		t.Fatal("expected error for missing config file")
 	}
 }
+
+func TestLoadConfig_FractionalStoreIntervalRejected(t *testing.T) {
+	resetEnv(t)
+
+	for _, body := range []string{
+		`{"store_interval": "500ms"}`,
+		`{"store_interval": "1500ms"}`,
+	} {
+		path := writeConfigFile(t, body)
+
+		if _, err := LoadConfig([]string{"-c", path}); err == nil {
+			t.Fatalf("expected error for %s, got nil", body)
+		}
+	}
+}
