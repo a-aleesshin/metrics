@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/a-aleesshin/metrics/internal/agent/application/usecase"
 	httpadapter "github.com/a-aleesshin/metrics/internal/agent/infra/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/a-aleesshin/metrics/internal/agent/transport/cli"
 	"github.com/a-aleesshin/metrics/internal/agent/transport/runner"
 	"github.com/a-aleesshin/metrics/internal/platform/buildinfo"
+	platformcrypto "github.com/a-aleesshin/metrics/internal/platform/crypto"
 	"github.com/a-aleesshin/metrics/internal/platform/logger"
 	"go.uber.org/zap"
 )
@@ -53,7 +55,22 @@ func run() error {
 	serverURL := flags.Address
 	retryClient := httpadapter.NewRetryClient(http.DefaultClient)
 	signingClient := httpadapter.NewSigningClient(retryClient, flags.KeySignature)
-	sender := httpadapter.NewMetricSender(serverURL, signingClient)
+
+	// Порядок цепочки: шифрование → подпись → ретраи. Подпись считается
+	// от шифртекста — сервер проверяет её до расшифровки.
+	var senderClient httpadapter.HTTPClient = signingClient
+
+	if flags.CryptoKey != "" {
+		publicKey, err := platformcrypto.LoadPublicKey(flags.CryptoKey)
+
+		if err != nil {
+			return fmt.Errorf("load crypto public key: %w", err)
+		}
+
+		senderClient = httpadapter.NewEncryptingClient(signingClient, publicKey)
+	}
+
+	sender := httpadapter.NewMetricSender(serverURL, senderClient)
 
 	collectUsecase := usecase.NewCollectMetricsUseCase(rider, repository, randomValue)
 	collectSystemUsecase := usecase.NewCollectSystemMetricsUseCase(systemReader, repository)
@@ -78,7 +95,7 @@ func run() error {
 		appLogger,
 	)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
 	return agentRunner.Run(ctx)
