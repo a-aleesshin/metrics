@@ -123,7 +123,7 @@ func (q QueryPostgresStorage) FindGaugeByName(ctx context.Context, name metric.N
 		WHERE metric.name = $1 AND metric.type = $2
 	`
 
-	errSql := retry.Do(ctx, platformpostgres.IsRetriable, func() error {
+	errSQL := retry.Do(ctx, platformpostgres.IsRetriable, func() error {
 		return q.pool.QueryRow(
 			ctx,
 			query,
@@ -132,12 +132,12 @@ func (q QueryPostgresStorage) FindGaugeByName(ctx context.Context, name metric.N
 		).Scan(&id, &metricName, &valueRaw)
 	})
 
-	if errors.Is(errSql, pgx.ErrNoRows) {
+	if errors.Is(errSQL, pgx.ErrNoRows) {
 		return 0, false, nil
 	}
 
-	if errSql != nil {
-		return 0, false, fmt.Errorf("get gauge by name: %w", errSql)
+	if errSQL != nil {
+		return 0, false, fmt.Errorf("get gauge by name: %w", errSQL)
 	}
 
 	gauge, err := metric.RestoreGauge(id, metricName, valueRaw)
@@ -160,7 +160,7 @@ func (q QueryPostgresStorage) FindCounterByName(ctx context.Context, name metric
 		WHERE metric.name = $1 AND metric.type = $2
 	`
 
-	errSql := retry.Do(ctx, platformpostgres.IsRetriable, func() error {
+	errSQL := retry.Do(ctx, platformpostgres.IsRetriable, func() error {
 		return q.pool.QueryRow(
 			ctx,
 			query,
@@ -169,12 +169,12 @@ func (q QueryPostgresStorage) FindCounterByName(ctx context.Context, name metric
 		).Scan(&id, &metricName, &value)
 	})
 
-	if errors.Is(errSql, pgx.ErrNoRows) {
+	if errors.Is(errSQL, pgx.ErrNoRows) {
 		return 0, false, nil
 	}
 
-	if errSql != nil {
-		return 0, false, fmt.Errorf("get counter by name: %w", errSql)
+	if errSQL != nil {
+		return 0, false, fmt.Errorf("get counter by name: %w", errSQL)
 	}
 
 	counter, err := metric.RestoreCounter(id, metricName, value)

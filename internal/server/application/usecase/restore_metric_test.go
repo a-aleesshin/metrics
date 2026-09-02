@@ -167,7 +167,7 @@ func TestRestoreMetricUseCase_Execute(t *testing.T) {
 
 			if tt.wantErrContains != "" {
 				if err == nil {
-					t.Fatalf("expected error %q, got %q", tt.wantErrContains, err.Error())
+					t.Fatalf("expected error %q, got nil", tt.wantErrContains)
 				}
 
 				if !strings.Contains(err.Error(), tt.wantErrContains) {

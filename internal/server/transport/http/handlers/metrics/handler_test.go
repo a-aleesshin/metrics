@@ -16,10 +16,10 @@ func TestHandler_RegisterRoutes_Smoke(t *testing.T) {
 
 	h := NewHandler(
 		NewUpdateHandler(updateUC, nil),
-		NewUpdateJsonHandler(updateUC, nil),
+		NewUpdateJSONHandler(updateUC, nil),
 		NewUpdatesHandler(updatesUC, nil),
 		NewValueHandler(valueUC),
-		NewValueJsonHandler(valueUC),
+		NewValueJSONHandler(valueUC),
 		NewListMetricsHandler(listUC),
 	)
 

@@ -48,10 +48,10 @@ func newBenchServer(b *testing.B) (http.Handler, *memory.MemStorage) {
 
 	metricsHandler := metrics.NewHandler(
 		metrics.NewUpdateHandler(updateUC, auditPublisher),
-		metrics.NewUpdateJsonHandler(updateUC, auditPublisher),
+		metrics.NewUpdateJSONHandler(updateUC, auditPublisher),
 		metrics.NewUpdatesHandler(updatesUC, auditPublisher),
 		metrics.NewValueHandler(valueUC),
-		metrics.NewValueJsonHandler(valueUC),
+		metrics.NewValueJSONHandler(valueUC),
 		metrics.NewListMetricsHandler(listUC),
 	)
 

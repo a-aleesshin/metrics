@@ -87,8 +87,8 @@ func TestUpdatesMetricsUseCase_Execute_UpdatesBatch(t *testing.T) {
 	}
 
 	gauge := repo.batch.Gauges[0]
-	if gauge.Id().String() != "gauge-id" {
-		t.Fatalf("expected gauge id %q, got %q", "gauge-id", gauge.Id().String())
+	if gauge.ID().String() != "gauge-id" {
+		t.Fatalf("expected gauge id %q, got %q", "gauge-id", gauge.ID().String())
 	}
 	if gauge.Name().String() != "Alloc" {
 		t.Fatalf("expected gauge name Alloc, got %s", gauge.Name().String())
@@ -102,8 +102,8 @@ func TestUpdatesMetricsUseCase_Execute_UpdatesBatch(t *testing.T) {
 	}
 
 	counter := repo.batch.Counters[0]
-	if counter.Id().String() != "counter-id" {
-		t.Fatalf("expected counter id %q, got %q", "counter-id", counter.Id().String())
+	if counter.ID().String() != "counter-id" {
+		t.Fatalf("expected counter id %q, got %q", "counter-id", counter.ID().String())
 	}
 	if counter.Name().String() != "PollCount" {
 		t.Fatalf("expected counter name PollCount, got %s", counter.Name().String())

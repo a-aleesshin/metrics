@@ -173,7 +173,7 @@ func TestMetricSnapshotMapper_SnapshotToDomain(t *testing.T) {
 					t.Fatalf("expected gauge %+v, got nil", test.gauge)
 				}
 
-				if gotGauge.Id().String() != test.gauge.Id().String() ||
+				if gotGauge.ID().String() != test.gauge.ID().String() ||
 					gotGauge.Name().String() != test.gauge.Name().String() ||
 					gotGauge.Value() != test.gauge.Value() {
 					t.Fatalf("expected gauge %+v, got %+v", test.gauge, gotGauge)
@@ -189,7 +189,7 @@ func TestMetricSnapshotMapper_SnapshotToDomain(t *testing.T) {
 					t.Fatalf("expected counter %+v, got nil", test.counter)
 				}
 
-				if gotCounter.Id().String() != test.counter.Id().String() ||
+				if gotCounter.ID().String() != test.counter.ID().String() ||
 					gotCounter.Name().String() != test.counter.Name().String() ||
 					gotCounter.Delta() != test.counter.Delta() {
 					t.Fatalf("expected counter %+v, got %+v", test.counter, gotCounter)

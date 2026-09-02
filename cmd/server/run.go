@@ -93,11 +93,11 @@ func run(cfg *cli.ServerConfig) error {
 	defer auditCleanup()
 
 	updateHandler := metrics.NewUpdateHandler(updateMetricsUC, auditPublisher)
-	updateJSONHandler := metrics.NewUpdateJsonHandler(updateMetricsUC, auditPublisher)
+	updateJSONHandler := metrics.NewUpdateJSONHandler(updateMetricsUC, auditPublisher)
 	updatesHandler := metrics.NewUpdatesHandler(updatesMetricsUC, auditPublisher)
 
 	valueHandler := metrics.NewValueHandler(getValueMetricUC)
-	valueJSONHandler := metrics.NewValueJsonHandler(getValueMetricUC)
+	valueJSONHandler := metrics.NewValueJSONHandler(getValueMetricUC)
 
 	listHandler := metrics.NewListMetricsHandler(listMetricsUC)
 

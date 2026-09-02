@@ -9,20 +9,20 @@ import (
 // Handler объединяет хендлеры метрик и регистрирует их маршруты в роутере chi.
 type Handler struct {
 	update     *UpdateHandler
-	updateJSON *UpdateJsonHandler
+	updateJSON *UpdateJSONHandler
 	updates    *UpdatesHandler
 	value      *ValueHandler
-	valueJSON  *ValueJsonHandler
+	valueJSON  *ValueJSONHandler
 	list       *ListMetricsHandler
 }
 
 // NewHandler создаёт составной хендлер метрик из отдельных хендлеров операций.
 func NewHandler(
 	update *UpdateHandler,
-	updateJSON *UpdateJsonHandler,
+	updateJSON *UpdateJSONHandler,
 	updates *UpdatesHandler,
 	value *ValueHandler,
-	valueJSON *ValueJsonHandler,
+	valueJSON *ValueJSONHandler,
 	list *ListMetricsHandler,
 ) *Handler {
 	return &Handler{

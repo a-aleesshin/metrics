@@ -110,7 +110,7 @@ func (p PostgresStorage) SaveGauge(ctx context.Context, gauge *metric.Gauge) err
 		_, err := p.pool.Exec(
 			ctx,
 			sql,
-			gauge.Id().String(),
+			gauge.ID().String(),
 			gauge.Name().String(),
 			metricTypeGauge,
 			gauge.Value(),
@@ -140,7 +140,7 @@ func (p PostgresStorage) SaveCounter(ctx context.Context, counter *metric.Counte
 		_, err := p.pool.Exec(
 			ctx,
 			sql,
-			counter.Id().String(),
+			counter.ID().String(),
 			counter.Name().String(),
 			metricTypeCounter,
 			counter.Delta(),
