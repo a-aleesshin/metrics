@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/a-aleesshin/metrics/internal/agent/application/usecase"
+	grpcadapter "github.com/a-aleesshin/metrics/internal/agent/infra/grpc"
 	httpadapter "github.com/a-aleesshin/metrics/internal/agent/infra/http"
 	"github.com/a-aleesshin/metrics/internal/agent/infra/persistence/memory"
 	randomadapter "github.com/a-aleesshin/metrics/internal/agent/infra/random"
@@ -52,25 +53,11 @@ func run() error {
 	repository := memory.NewMemMetricRepository()
 	randomValue := randomadapter.NewRandomValueAdapter()
 
-	serverURL := flags.Address
-	retryClient := httpadapter.NewRetryClient(http.DefaultClient)
-	signingClient := httpadapter.NewSigningClient(retryClient, flags.KeySignature)
-
-	// Порядок цепочки: шифрование → подпись → ретраи. Подпись считается
-	// от шифртекста — сервер проверяет её до расшифровки.
-	var senderClient httpadapter.HTTPClient = signingClient
-
-	if flags.CryptoKey != "" {
-		publicKey, err := platformcrypto.LoadPublicKey(flags.CryptoKey)
-
-		if err != nil {
-			return fmt.Errorf("load crypto public key: %w", err)
-		}
-
-		senderClient = httpadapter.NewEncryptingClient(signingClient, publicKey)
+	sender, senderCleanup, err := buildMetricSender(flags)
+	if err != nil {
+		return err
 	}
-
-	sender := httpadapter.NewMetricSender(serverURL, senderClient)
+	defer senderCleanup()
 
 	collectUsecase := usecase.NewCollectMetricsUseCase(rider, repository, randomValue)
 	collectSystemUsecase := usecase.NewCollectSystemMetricsUseCase(systemReader, repository)
@@ -99,4 +86,34 @@ func run() error {
 	defer stop()
 
 	return agentRunner.Run(ctx)
+}
+
+// buildMetricSender выбирает транспорт отправки метрик: gRPC при заданном
+// GRPCAddress, иначе HTTP
+func buildMetricSender(flags *cli.AgentConfig) (usecase.MetricSender, func(), error) {
+	if flags.GRPCAddress != "" {
+		grpcSender, err := grpcadapter.NewMetricSender(flags.GRPCAddress)
+		if err != nil {
+			return nil, nil, fmt.Errorf("create grpc sender: %w", err)
+		}
+
+		return grpcSender, func() { _ = grpcSender.Close() }, nil
+	}
+
+	retryClient := httpadapter.NewRetryClient(http.DefaultClient)
+	signingClient := httpadapter.NewSigningClient(retryClient, flags.KeySignature)
+
+	var senderClient httpadapter.HTTPClient = signingClient
+
+	if flags.CryptoKey != "" {
+		publicKey, err := platformcrypto.LoadPublicKey(flags.CryptoKey)
+
+		if err != nil {
+			return nil, nil, fmt.Errorf("load crypto public key: %w", err)
+		}
+
+		senderClient = httpadapter.NewEncryptingClient(signingClient, publicKey)
+	}
+
+	return httpadapter.NewMetricSender(flags.Address, senderClient), func() {}, nil
 }
