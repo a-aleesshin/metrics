@@ -49,7 +49,7 @@ func (g *Gauge) UpdateValue(value float64) {
 }
 
 // Id возвращает идентификатор gauge.
-func (g *Gauge) Id() ID {
+func (g *Gauge) ID() ID {
 	return g.id
 }
 
@@ -109,7 +109,7 @@ func (c *Counter) Add(delta int64) {
 }
 
 // Id возвращает идентификатор counter.
-func (c *Counter) Id() ID {
+func (c *Counter) ID() ID {
 	return c.id
 }
 

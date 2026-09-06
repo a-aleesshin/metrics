@@ -62,7 +62,7 @@ func (m *MemStorage) SaveGauge(ctx context.Context, gauge *metric.Gauge) error {
 	defer m.mu.Unlock()
 
 	m.gauges[gauge.Name().String()] = gaugeRecord{
-		ID:    gauge.Id().String(),
+		ID:    gauge.ID().String(),
 		Name:  gauge.Name().String(),
 		Value: gauge.Value(),
 	}
@@ -95,7 +95,7 @@ func (m *MemStorage) SaveCounter(ctx context.Context, counter *metric.Counter) e
 	defer m.mu.Unlock()
 
 	m.counter[counter.Name().String()] = counterRecord{
-		ID:    counter.Id().String(),
+		ID:    counter.ID().String(),
 		Name:  counter.Name().String(),
 		Delta: counter.Delta(),
 	}
@@ -204,7 +204,7 @@ func (m *MemStorage) UpdateBatch(ctx context.Context, batch repository.MetricBat
 
 	for _, gauge := range batch.Gauges {
 		m.gauges[gauge.Name().String()] = gaugeRecord{
-			ID:    gauge.Id().String(),
+			ID:    gauge.ID().String(),
 			Name:  gauge.Name().String(),
 			Value: gauge.Value(),
 		}
@@ -216,7 +216,7 @@ func (m *MemStorage) UpdateBatch(ctx context.Context, batch repository.MetricBat
 		rec, ok := m.counter[name]
 		if !ok {
 			m.counter[name] = counterRecord{
-				ID:    counter.Id().String(),
+				ID:    counter.ID().String(),
 				Name:  name,
 				Delta: counter.Delta(),
 			}

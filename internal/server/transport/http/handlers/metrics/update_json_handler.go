@@ -10,22 +10,22 @@ import (
 	"github.com/a-aleesshin/metrics/internal/server/transport/http/httperror"
 )
 
-// UpdateJsonHandler обновляет одну метрику из JSON-тела запроса.
-type UpdateJsonHandler struct {
+// UpdateJSONHandler обновляет одну метрику из JSON-тела запроса.
+type UpdateJSONHandler struct {
 	updateMetric UpdateMetricsUseCase
 	audit        AuditPublisher
 }
 
-// NewUpdateJsonHandler создаёт хендлер обновления метрики из JSON;
+// NewUpdateJSONHandler создаёт хендлер обновления метрики из JSON;
 // audit может быть nil — тогда аудит отключён.
-func NewUpdateJsonHandler(usecase UpdateMetricsUseCase, audit AuditPublisher) *UpdateJsonHandler {
-	return &UpdateJsonHandler{updateMetric: usecase, audit: audit}
+func NewUpdateJSONHandler(usecase UpdateMetricsUseCase, audit AuditPublisher) *UpdateJSONHandler {
+	return &UpdateJSONHandler{updateMetric: usecase, audit: audit}
 }
 
 // UpdateJSON обрабатывает POST /update с JSON-телом Metrics: обновляет метрику,
 // публикует событие аудита и возвращает 200 с эхом запроса; 400 — неверный
 // Content-Type, тело, тип метрики или отсутствующее значение.
-func (h *UpdateJsonHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
+func (h *UpdateJSONHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 	if !platformhttp.IsJSON(r) {
 		http.Error(w, "invalid content type", http.StatusBadRequest)
 		return
@@ -86,5 +86,4 @@ func (h *UpdateJsonHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	return
 }

@@ -54,7 +54,7 @@ func (b BatchRepository) updateBatch(ctx context.Context, tx pgx.Tx, batch repos
 	for _, gauge := range batch.Gauges {
 		pgxBatch.Queue(
 			gaugeSQL,
-			gauge.Id().String(),
+			gauge.ID().String(),
 			gauge.Name().String(),
 			metricTypeGauge,
 			gauge.Value(),
@@ -74,7 +74,7 @@ func (b BatchRepository) updateBatch(ctx context.Context, tx pgx.Tx, batch repos
 	for _, counter := range batch.Counters {
 		pgxBatch.Queue(
 			counterSQL,
-			counter.Id().String(),
+			counter.ID().String(),
 			counter.Name().String(),
 			metricTypeCounter,
 			counter.Delta(),

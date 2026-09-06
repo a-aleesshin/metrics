@@ -28,10 +28,10 @@ func newExampleServer() http.Handler {
 
 	handler := metrics.NewHandler(
 		metrics.NewUpdateHandler(updateUC, nil),
-		metrics.NewUpdateJsonHandler(updateUC, nil),
+		metrics.NewUpdateJSONHandler(updateUC, nil),
 		metrics.NewUpdatesHandler(updatesUC, nil),
 		metrics.NewValueHandler(valueUC),
-		metrics.NewValueJsonHandler(valueUC),
+		metrics.NewValueJSONHandler(valueUC),
 		metrics.NewListMetricsHandler(listUC),
 	)
 
@@ -52,9 +52,9 @@ func ExampleUpdateHandler_Update() {
 	// Output: 200
 }
 
-// ExampleUpdateJsonHandler_UpdateJSON — обновление метрики JSON-телом:
+// ExampleUpdateJSONHandler_UpdateJSON — обновление метрики JSON-телом:
 // POST /update. В ответ сервер возвращает принятую метрику.
-func ExampleUpdateJsonHandler_UpdateJSON() {
+func ExampleUpdateJSONHandler_UpdateJSON() {
 	server := newExampleServer()
 
 	body := `{"id":"Alloc","type":"gauge","value":123.45}`
@@ -107,9 +107,9 @@ func ExampleValueHandler_Value() {
 	// Output: 123.45
 }
 
-// ExampleValueJsonHandler_ValueJSON — чтение значения метрики JSON-запросом:
+// ExampleValueJSONHandler_ValueJSON — чтение значения метрики JSON-запросом:
 // POST /value с телом {"id": ..., "type": ...}.
-func ExampleValueJsonHandler_ValueJSON() {
+func ExampleValueJSONHandler_ValueJSON() {
 	server := newExampleServer()
 
 	update := httptest.NewRequest(http.MethodPost, "/update/counter/PollCount/5", nil)

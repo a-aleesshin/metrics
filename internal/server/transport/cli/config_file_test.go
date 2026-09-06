@@ -28,7 +28,9 @@ func TestLoadConfig_FromFile(t *testing.T) {
 		"store_file": "/tmp/file.db",
 		"database_dsn": "",
 		"crypto_key": "/tmp/key.pem",
-		"key": "file-key"
+		"key": "file-key",
+		"grpc_address": "localhost:3200",
+		"trusted_subnet": "10.0.0.0/8"
 	}`)
 
 	cfg, err := LoadConfig([]string{"-c", path})
@@ -62,6 +64,39 @@ func TestLoadConfig_FromFile(t *testing.T) {
 
 	if cfg.KeySignature != "file-key" {
 		t.Fatalf("expected key from file, got %s", cfg.KeySignature)
+	}
+
+	if cfg.GRPCAddress != "localhost:3200" {
+		t.Fatalf("expected grpc address from file, got %s", cfg.GRPCAddress)
+	}
+
+	if cfg.TrustedSubnet != "10.0.0.0/8" {
+		t.Fatalf("expected trusted subnet from file, got %s", cfg.TrustedSubnet)
+	}
+}
+
+func TestLoadConfig_GRPCFlagsAndEnv(t *testing.T) {
+	resetEnv(t)
+
+	cfg, err := LoadConfig([]string{"-grpc-address", "localhost:3200", "-t", "192.168.0.0/24"})
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.GRPCAddress != "localhost:3200" || cfg.TrustedSubnet != "192.168.0.0/24" {
+		t.Fatalf("expected values from flags, got %+v", cfg)
+	}
+
+	t.Setenv("GRPC_ADDRESS", "localhost:3300")
+	t.Setenv("TRUSTED_SUBNET", "10.0.0.0/8")
+
+	cfg, err = LoadConfig([]string{"-grpc-address", "localhost:3200", "-t", "192.168.0.0/24"})
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.GRPCAddress != "localhost:3300" || cfg.TrustedSubnet != "10.0.0.0/8" {
+		t.Fatalf("expected env to beat flags, got %+v", cfg)
 	}
 }
 

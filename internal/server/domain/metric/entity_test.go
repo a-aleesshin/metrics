@@ -58,8 +58,8 @@ func TestNewGauge(t *testing.T) {
 				return
 			}
 
-			if got.Id() != tt.wantID {
-				t.Fatalf("expected id %q, got %q", tt.wantID, got.Id())
+			if got.ID() != tt.wantID {
+				t.Fatalf("expected id %q, got %q", tt.wantID, got.ID())
 			}
 
 			if got.Name() != tt.wantName {
@@ -192,8 +192,8 @@ func TestNewCounter(t *testing.T) {
 				return
 			}
 
-			if got.Id() != tt.wantID {
-				t.Fatalf("expected id %q, got %q", tt.wantID, got.Id())
+			if got.ID() != tt.wantID {
+				t.Fatalf("expected id %q, got %q", tt.wantID, got.ID())
 			}
 
 			if got.Name() != tt.wantName {

@@ -191,3 +191,33 @@ go build -ldflags "-X main.buildVersion=v1.0.0 -X main.buildDate=$(date +%Y-%m-%
 
 Если собрать без `-ldflags` (например, обычным `go build ./cmd/server`),
 вместо незаданных значений будет напечатано `N/A`.
+
+### gRPC-транспорт метрик
+
+Помимо HTTP, агент может отправлять метрики батчами по gRPC (протокол —
+`api/proto/metrics.proto`, сгенерированный код — `internal/proto`).
+Сервис `Metrics.UpdateMetrics` на сервере использует тот же usecase
+батчевого обновления, что и `POST /updates`.
+
+Запуск сервера с gRPC и проверкой доверенной подсети (interceptor читает
+IP агента из метаданных `x-real-ip`; запросы вне подсети отклоняются:
+
+```
+./server -grpc-address 127.0.0.1:3200 -t 192.168.0.0/24
+```
+
+Агент переключается на gRPC, когда задан адрес:
+
+```
+./agent -grpc-address 127.0.0.1:3200
+```
+
+Параметры настраиваются флагами (`-grpc-address`, `-t`), переменными
+окружения (`GRPC_ADDRESS`, `TRUSTED_SUBNET`) и JSON-конфигом
+(`grpc_address`, `trusted_subnet`) с обычным приоритетом источников.
+
+Перегенерация кода из proto (нужны protoc, protoc-gen-go, protoc-gen-go-grpc):
+
+```
+protoc --proto_path=api/proto --go_out=internal/proto --go_opt=paths=source_relative --go_opt=default_api_level=API_OPAQUE --go-grpc_out=internal/proto --go-grpc_opt=paths=source_relative api/proto/metrics.proto
+```

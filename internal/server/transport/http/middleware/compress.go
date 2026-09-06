@@ -52,7 +52,6 @@ func DecompressRequest(next http.Handler) http.Handler {
 		r.Header.Del("Content-Length")
 
 		next.ServeHTTP(w, r)
-		return
 	})
 }
 

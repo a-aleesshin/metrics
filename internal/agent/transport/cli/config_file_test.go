@@ -38,7 +38,8 @@ func TestLoadConfig_FromFile(t *testing.T) {
 		"poll_interval": "3s",
 		"crypto_key": "/tmp/pub.pem",
 		"key": "file-key",
-		"rate_limit": 4
+		"rate_limit": 4,
+		"grpc_address": "localhost:3200"
 	}`)
 
 	cfg, err := LoadConfig([]string{"-c", path})
@@ -68,6 +69,10 @@ func TestLoadConfig_FromFile(t *testing.T) {
 
 	if cfg.RateLimit != 4 {
 		t.Fatalf("expected rate limit from file, got %d", cfg.RateLimit)
+	}
+
+	if cfg.GRPCAddress != "localhost:3200" {
+		t.Fatalf("expected grpc address from file, got %s", cfg.GRPCAddress)
 	}
 }
 

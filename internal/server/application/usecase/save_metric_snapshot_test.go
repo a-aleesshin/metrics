@@ -24,15 +24,17 @@ func (s *metricStateRepositoryStub) GetAllMetrics(ctx context.Context) (reposito
 }
 
 type metricSnapshotStoreStubSaveUC struct {
-	saved   []repository.MetricSnapshot
-	saveErr error
-	loadErr error
+	saved     []repository.MetricSnapshot
+	saveCalls int
+	saveErr   error
+	loadErr   error
 }
 
 func (s *metricSnapshotStoreStubSaveUC) Save(ctx context.Context, metrics []repository.MetricSnapshot) error {
 	if s.saveErr != nil {
 		return s.saveErr
 	}
+	s.saveCalls++
 	s.saved = append([]repository.MetricSnapshot(nil), metrics...)
 	return nil
 }
@@ -151,7 +153,7 @@ func TestSaveMetricSnapshotUseCase_Execute(t *testing.T) {
 			// Assert
 			if tt.wantErr != "" {
 				if err == nil {
-					t.Fatalf("expected error %q, got %q", tt.wantErr, err.Error())
+					t.Fatalf("expected error %q, got nil", tt.wantErr)
 				}
 
 				if !strings.Contains(err.Error(), tt.wantErr) {
@@ -165,11 +167,11 @@ func TestSaveMetricSnapshotUseCase_Execute(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if tt.wantSaveCalls == 0 && snapshotStore.saved != nil {
+			if tt.wantSaveCalls == 0 && snapshotStore.saveCalls != 0 {
 				t.Fatalf("expected no saved snapshots, got %+v", snapshotStore.saved)
 			}
 
-			if tt.wantSaveCalls > 0 && snapshotStore == nil {
+			if tt.wantSaveCalls > 0 && snapshotStore.saveCalls == 0 {
 				t.Fatalf("expected saved snapshots, got nil")
 			}
 

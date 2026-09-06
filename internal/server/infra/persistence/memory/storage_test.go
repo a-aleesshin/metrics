@@ -74,8 +74,8 @@ func TestMemStorage_GaugeOperations(t *testing.T) {
 				t.Fatal("expected gauge, got nil")
 			}
 
-			if got.Id().String() != tt.wantID {
-				t.Fatalf("expected id %q, got %q", tt.wantID, got.Id().String())
+			if got.ID().String() != tt.wantID {
+				t.Fatalf("expected id %q, got %q", tt.wantID, got.ID().String())
 			}
 
 			if got.Name().String() != tt.wantName {
@@ -155,8 +155,8 @@ func TestMemStorage_CounterOperations(t *testing.T) {
 				t.Fatal("expected counter, got nil")
 			}
 
-			if got.Id().String() != tt.wantID {
-				t.Fatalf("expected id %q, got %q", tt.wantID, got.Id().String())
+			if got.ID().String() != tt.wantID {
+				t.Fatalf("expected id %q, got %q", tt.wantID, got.ID().String())
 			}
 
 			if got.Name().String() != tt.wantName {

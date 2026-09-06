@@ -66,9 +66,9 @@ func TestUpdateHandler_NoAuditOnError(t *testing.T) {
 	}
 }
 
-func TestUpdateJsonHandler_PublishesAuditOnSuccess(t *testing.T) {
+func TestUpdateJSONHandler_PublishesAuditOnSuccess(t *testing.T) {
 	auditSpy := &auditPublisherSpy{}
-	handler := NewUpdateJsonHandler(&updateMetricUseCaseSpy{}, auditSpy)
+	handler := NewUpdateJSONHandler(&updateMetricUseCaseSpy{}, auditSpy)
 
 	body := `{"id":"Alloc","type":"gauge","value":123.45}`
 	req := httptest.NewRequest(http.MethodPost, "/update", strings.NewReader(body))
