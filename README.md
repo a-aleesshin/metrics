@@ -219,5 +219,5 @@ IP агента из метаданных `x-real-ip`; запросы вне п�
 Перегенерация кода из proto (нужны protoc, protoc-gen-go, protoc-gen-go-grpc):
 
 ```
-protoc --proto_path=api/proto --go_out=internal/proto --go_opt=paths=source_relative --go-grpc_out=internal/proto --go-grpc_opt=paths=source_relative api/proto/metrics.proto
+protoc --proto_path=api/proto --go_out=internal/proto --go_opt=paths=source_relative --go_opt=default_api_level=API_OPAQUE --go-grpc_out=internal/proto --go-grpc_opt=paths=source_relative api/proto/metrics.proto
 ```

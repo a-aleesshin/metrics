@@ -5,6 +5,7 @@ import (
 
 	pb "github.com/a-aleesshin/metrics/internal/proto"
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
+	sharedlogger "github.com/a-aleesshin/metrics/internal/shared/port/logger"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -17,10 +18,11 @@ type MetricsServer struct {
 	pb.UnimplementedMetricsServer
 
 	useCase UpdatesMetricsUseCase
+	logger  sharedlogger.Logger
 }
 
-func NewMetricsServer(useCase UpdatesMetricsUseCase) *MetricsServer {
-	return &MetricsServer{useCase: useCase}
+func NewMetricsServer(useCase UpdatesMetricsUseCase, logger sharedlogger.Logger) *MetricsServer {
+	return &MetricsServer{useCase: useCase, logger: logger}
 }
 
 func (s *MetricsServer) UpdateMetrics(ctx context.Context, req *pb.UpdateMetricsRequest) (*pb.UpdateMetricsResponse, error) {
@@ -40,7 +42,11 @@ func (s *MetricsServer) UpdateMetrics(ctx context.Context, req *pb.UpdateMetrics
 	}
 
 	if err := s.useCase.Execute(ctx, usecase.UpdatesMetricsCommand{Metrics: commands}); err != nil {
-		return nil, status.Errorf(codes.Internal, "update metrics: %v", err)
+		if s.logger != nil {
+			s.logger.Error("update metrics failed", sharedlogger.Err(err))
+		}
+
+		return nil, status.Error(codes.Internal, "internal server error")
 	}
 
 	return &pb.UpdateMetricsResponse{}, nil

@@ -92,7 +92,11 @@ func run() error {
 // GRPCAddress, иначе HTTP
 func buildMetricSender(flags *cli.AgentConfig) (usecase.MetricSender, func(), error) {
 	if flags.GRPCAddress != "" {
-		grpcSender, err := grpcadapter.NewMetricSender(flags.GRPCAddress)
+		if flags.GRPCCAFile == "" {
+			return nil, nil, fmt.Errorf("grpc transport requires -grpc-ca (path to trusted server certificate)")
+		}
+
+		grpcSender, err := grpcadapter.NewMetricSender(flags.GRPCAddress, flags.GRPCCAFile)
 		if err != nil {
 			return nil, nil, fmt.Errorf("create grpc sender: %w", err)
 		}

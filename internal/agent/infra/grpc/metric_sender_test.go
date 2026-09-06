@@ -3,10 +3,13 @@ package grpcadapter
 import (
 	"context"
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/a-aleesshin/metrics/internal/agent/application/dto"
+	"github.com/a-aleesshin/metrics/internal/platform/grpccreds"
 	pb "github.com/a-aleesshin/metrics/internal/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -43,8 +46,23 @@ func newTestSender(t *testing.T) (*MetricSender, *captureServer) {
 
 	capture := &captureServer{}
 
+	certPEM, keyPEM, err := grpccreds.GenerateSelfSigned("bufnet")
+	if err != nil {
+		t.Fatalf("generate certificate: %v", err)
+	}
+
+	serverCreds, err := grpccreds.ServerFromPEM(certPEM, keyPEM)
+	if err != nil {
+		t.Fatalf("server creds: %v", err)
+	}
+
+	caPath := filepath.Join(t.TempDir(), "ca.pem")
+	if err := os.WriteFile(caPath, certPEM, 0o600); err != nil {
+		t.Fatalf("write ca file: %v", err)
+	}
+
 	listener := bufconn.Listen(1024 * 1024)
-	server := grpc.NewServer()
+	server := grpc.NewServer(grpc.Creds(serverCreds))
 	pb.RegisterMetricsServer(server, capture)
 
 	go func() { _ = server.Serve(listener) }()
@@ -52,6 +70,7 @@ func newTestSender(t *testing.T) (*MetricSender, *captureServer) {
 
 	sender, err := NewMetricSender(
 		"passthrough:///bufnet",
+		caPath,
 		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
 			return listener.DialContext(ctx)
 		}),

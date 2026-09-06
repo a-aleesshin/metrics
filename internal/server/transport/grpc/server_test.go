@@ -5,6 +5,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/a-aleesshin/metrics/internal/platform/grpccreds"
 	"github.com/a-aleesshin/metrics/internal/platform/id"
 	pb "github.com/a-aleesshin/metrics/internal/proto"
 	"github.com/a-aleesshin/metrics/internal/server/application/usecase"
@@ -13,7 +14,6 @@ import (
 	grpctransport "github.com/a-aleesshin/metrics/internal/server/transport/grpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
@@ -36,17 +36,35 @@ func startTestServer(t *testing.T, subnetCIDR string) (pb.MetricsClient, *memory
 		subnet = parsed
 	}
 
+	certPEM, keyPEM, err := grpccreds.GenerateSelfSigned("bufnet")
+	if err != nil {
+		t.Fatalf("generate certificate: %v", err)
+	}
+
+	serverCreds, err := grpccreds.ServerFromPEM(certPEM, keyPEM)
+	if err != nil {
+		t.Fatalf("server creds: %v", err)
+	}
+
+	clientCreds, err := grpccreds.ClientFromPEM(certPEM)
+	if err != nil {
+		t.Fatalf("client creds: %v", err)
+	}
+
 	listener := bufconn.Listen(1024 * 1024)
 
-	server := grpc.NewServer(grpc.UnaryInterceptor(grpctransport.TrustedSubnetInterceptor(subnet)))
-	pb.RegisterMetricsServer(server, grpctransport.NewMetricsServer(useCase))
+	server := grpc.NewServer(
+		grpc.Creds(serverCreds),
+		grpc.UnaryInterceptor(grpctransport.TrustedSubnetInterceptor(subnet)),
+	)
+	pb.RegisterMetricsServer(server, grpctransport.NewMetricsServer(useCase, nil))
 
 	go func() { _ = server.Serve(listener) }()
 	t.Cleanup(server.Stop)
 
 	conn, err := grpc.NewClient(
 		"passthrough:///bufnet",
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(clientCreds),
 		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
 			return listener.DialContext(ctx)
 		}),
@@ -67,10 +85,10 @@ func TestUpdateMetrics_StoresBatch(t *testing.T) {
 	client, storage := startTestServer(t, "")
 	ctx := t.Context()
 
-	request := &pb.UpdateMetricsRequest{Metrics: []*pb.Metric{
-		{Id: "Alloc", Type: pb.Metric_GAUGE, Value: 123.45},
-		{Id: "PollCount", Type: pb.Metric_COUNTER, Delta: 5},
-	}}
+	request := pb.UpdateMetricsRequest_builder{Metrics: []*pb.Metric{
+		pb.Metric_builder{Id: "Alloc", Type: pb.Metric_GAUGE, Value: 123.45}.Build(),
+		pb.Metric_builder{Id: "PollCount", Type: pb.Metric_COUNTER, Delta: 5}.Build(),
+	}}.Build()
 
 	if _, err := client.UpdateMetrics(ctx, request); err != nil {
 		t.Fatalf("update metrics: %v", err)
@@ -110,9 +128,9 @@ func TestUpdateMetrics_EmptyBatchIsNoop(t *testing.T) {
 func TestUpdateMetrics_MissingIDRejected(t *testing.T) {
 	client, _ := startTestServer(t, "")
 
-	request := &pb.UpdateMetricsRequest{Metrics: []*pb.Metric{
-		{Id: "", Type: pb.Metric_GAUGE, Value: 1},
-	}}
+	request := pb.UpdateMetricsRequest_builder{Metrics: []*pb.Metric{
+		pb.Metric_builder{Type: pb.Metric_GAUGE, Value: 1}.Build(),
+	}}.Build()
 
 	_, err := client.UpdateMetrics(t.Context(), request)
 	if status.Code(err) != codes.InvalidArgument {
@@ -125,9 +143,9 @@ func TestTrustedSubnet_AllowsIPFromSubnet(t *testing.T) {
 
 	ctx := withRealIP(t.Context(), "10.1.2.3")
 
-	request := &pb.UpdateMetricsRequest{Metrics: []*pb.Metric{
-		{Id: "Alloc", Type: pb.Metric_GAUGE, Value: 1.5},
-	}}
+	request := pb.UpdateMetricsRequest_builder{Metrics: []*pb.Metric{
+		pb.Metric_builder{Id: "Alloc", Type: pb.Metric_GAUGE, Value: 1.5}.Build(),
+	}}.Build()
 
 	if _, err := client.UpdateMetrics(ctx, request); err != nil {
 		t.Fatalf("expected success for trusted ip, got %v", err)

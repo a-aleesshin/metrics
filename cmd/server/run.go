@@ -5,7 +5,6 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -15,6 +14,7 @@ import (
 
 	platformcrypto "github.com/a-aleesshin/metrics/internal/platform/crypto"
 	platformpostgres "github.com/a-aleesshin/metrics/internal/platform/db/postgres"
+	"github.com/a-aleesshin/metrics/internal/platform/grpccreds"
 	"github.com/a-aleesshin/metrics/internal/platform/health"
 	sharedrouter "github.com/a-aleesshin/metrics/internal/platform/http"
 	"github.com/a-aleesshin/metrics/internal/platform/id"
@@ -135,7 +135,7 @@ func run(cfg *cli.ServerConfig) error {
 		Handler: router,
 	}
 
-	grpcServer, err := startGRPCServer(cfg, updatesMetricsUC)
+	grpcServer, err := startGRPCServer(cfg, updatesMetricsUC, loggers.appLogger)
 	if err != nil {
 		return err
 	}
@@ -143,15 +143,24 @@ func run(cfg *cli.ServerConfig) error {
 	serverCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
-	startPeriodicSnapshot(serverCtx, cfg.StoreInterval, runtime.periodicSaver)
+	startPeriodicSnapshot(serverCtx, cfg.StoreInterval, runtime.periodicSaver, loggers.appLogger)
 
 	return serve(serverCtx, server, grpcServer, runtime.periodicSaver)
 }
 
 // startGRPCServer запускает gRPC-сервер метрик, если задан адрес в конфигурации.
-func startGRPCServer(cfg *cli.ServerConfig, useCase grpctransport.UpdatesMetricsUseCase) (*grpc.Server, error) {
+func startGRPCServer(cfg *cli.ServerConfig, useCase grpctransport.UpdatesMetricsUseCase, logger sharedlogger.Logger) (*grpc.Server, error) {
 	if cfg.GRPCAddress == "" {
 		return nil, nil
+	}
+
+	if cfg.GRPCCertFile == "" || cfg.GRPCKeyFile == "" {
+		return nil, fmt.Errorf("grpc server requires -grpc-cert and -grpc-key (TLS certificate and key)")
+	}
+
+	creds, err := grpccreds.Server(cfg.GRPCCertFile, cfg.GRPCKeyFile)
+	if err != nil {
+		return nil, err
 	}
 
 	subnet, err := parseTrustedSubnet(cfg.TrustedSubnet)
@@ -165,13 +174,16 @@ func startGRPCServer(cfg *cli.ServerConfig, useCase grpctransport.UpdatesMetrics
 	}
 
 	grpcServer := grpc.NewServer(
+		grpc.Creds(creds),
 		grpc.UnaryInterceptor(grpctransport.TrustedSubnetInterceptor(subnet)),
 	)
-	pb.RegisterMetricsServer(grpcServer, grpctransport.NewMetricsServer(useCase))
+	pb.RegisterMetricsServer(grpcServer, grpctransport.NewMetricsServer(useCase, logger))
+
+	logger.Info("grpc server started", sharedlogger.String("address", cfg.GRPCAddress))
 
 	go func() {
 		if err := grpcServer.Serve(listener); err != nil {
-			log.Printf("grpc server stopped: %v", err)
+			logger.Error("grpc server stopped", sharedlogger.Err(err))
 		}
 	}()
 
@@ -192,7 +204,7 @@ func parseTrustedSubnet(value string) (*net.IPNet, error) {
 	return subnet, nil
 }
 
-func startPeriodicSnapshot(ctx context.Context, interval time.Duration, saver usecase.SnapshotSaver) {
+func startPeriodicSnapshot(ctx context.Context, interval time.Duration, saver usecase.SnapshotSaver, logger sharedlogger.Logger) {
 	if saver == nil || interval <= 0 {
 		return
 	}
@@ -205,7 +217,7 @@ func startPeriodicSnapshot(ctx context.Context, interval time.Duration, saver us
 			select {
 			case <-ticker.C:
 				if err := saver.Execute(ctx); err != nil {
-					log.Printf("periodic snapshot save failed: %v", err)
+					logger.Error("periodic snapshot save failed", sharedlogger.Err(err))
 				}
 			case <-ctx.Done():
 				return

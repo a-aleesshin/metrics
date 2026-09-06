@@ -20,6 +20,7 @@ type fileAgentConfig struct {
 	PollInterval   string `json:"poll_interval"`
 	CryptoKey      string `json:"crypto_key"`
 	GRPCAddress    string `json:"grpc_address"`
+	GRPCCAFile     string `json:"grpc_ca_file"`
 	Key            string `json:"key"`
 	RateLimit      int    `json:"rate_limit"`
 }
@@ -34,6 +35,7 @@ type AgentConfig struct {
 	RateLimit      int
 	CryptoKey      string
 	GRPCAddress    string
+	GRPCCAFile     string
 }
 
 var (
@@ -55,6 +57,7 @@ func LoadConfig(args []string) (*AgentConfig, error) {
 	var keySignature string
 	var cryptoKey string
 	var grpcAddress string
+	var grpcCAFile string
 	var configPath string
 	var reportInterval int
 	var pollInterval int
@@ -67,6 +70,7 @@ func LoadConfig(args []string) (*AgentConfig, error) {
 	fs.IntVar(&rateLimit, "l", rateLimitDefault, "outgoing requests rate limit")
 	fs.StringVar(&cryptoKey, "crypto-key", "", "path to RSA public key PEM file (encryption disabled if empty)")
 	fs.StringVar(&grpcAddress, "grpc-address", "", "gRPC server address (metrics are sent over gRPC when set)")
+	fs.StringVar(&grpcCAFile, "grpc-ca", "", "path to PEM file with trusted gRPC server certificate")
 	fs.StringVar(&configPath, "c", "", "path to JSON config file")
 	fs.StringVar(&configPath, "config", "", "path to JSON config file")
 
@@ -126,6 +130,10 @@ func LoadConfig(args []string) (*AgentConfig, error) {
 		if !setFlags["grpc-address"] && file.GRPCAddress != "" {
 			grpcAddress = file.GRPCAddress
 		}
+
+		if !setFlags["grpc-ca"] && file.GRPCCAFile != "" {
+			grpcCAFile = file.GRPCCAFile
+		}
 	}
 
 	valueAddress, err := getStringValue(&address, "ADDRESS")
@@ -155,6 +163,7 @@ func LoadConfig(args []string) (*AgentConfig, error) {
 	config.KeySignature = getOptionalStringValue(&keySignature, "KEY")
 	config.CryptoKey = getOptionalStringValue(&cryptoKey, "CRYPTO_KEY")
 	config.GRPCAddress = getOptionalStringValue(&grpcAddress, "GRPC_ADDRESS")
+	config.GRPCCAFile = getOptionalStringValue(&grpcCAFile, "GRPC_CA_FILE")
 
 	valueRateLimit, err := getIntValue(&rateLimit, "RATE_LIMIT")
 

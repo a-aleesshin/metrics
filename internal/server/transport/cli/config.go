@@ -44,6 +44,8 @@ type ServerConfig struct {
 	AuditURL        string
 	CryptoKey       string
 	GRPCAddress     string
+	GRPCCertFile    string
+	GRPCKeyFile     string
 	TrustedSubnet   string
 }
 
@@ -59,6 +61,8 @@ type rawServerConfig struct {
 	AuditURL        string `env:"AUDIT_URL"`
 	CryptoKey       string `env:"CRYPTO_KEY"`
 	GRPCAddress     string `env:"GRPC_ADDRESS"`
+	GRPCCertFile    string `env:"GRPC_CERT_FILE"`
+	GRPCKeyFile     string `env:"GRPC_KEY_FILE"`
 	TrustedSubnet   string `env:"TRUSTED_SUBNET"`
 }
 
@@ -73,6 +77,8 @@ type rawServerConfigSource struct {
 	AuditURL        ValueSource
 	CryptoKey       ValueSource
 	GRPCAddress     ValueSource
+	GRPCCertFile    ValueSource
+	GRPCKeyFile     ValueSource
 	TrustedSubnet   ValueSource
 }
 
@@ -86,6 +92,8 @@ type fileServerConfig struct {
 	DatabaseDSN   string `json:"database_dsn"`
 	CryptoKey     string `json:"crypto_key"`
 	GRPCAddress   string `json:"grpc_address"`
+	GRPCCertFile  string `json:"grpc_cert_file"`
+	GRPCKeyFile   string `json:"grpc_key_file"`
 	TrustedSubnet string `json:"trusted_subnet"`
 	Key           string `json:"key"`
 	AuditFile     string `json:"audit_file"`
@@ -113,6 +121,8 @@ func defaultRawServerConfig() (*rawServerConfig, *rawServerConfigSource) {
 			AuditURL:        ValueSourceDefault,
 			CryptoKey:       ValueSourceDefault,
 			GRPCAddress:     ValueSourceDefault,
+			GRPCCertFile:    ValueSourceDefault,
+			GRPCKeyFile:     ValueSourceDefault,
 			TrustedSubnet:   ValueSourceDefault,
 		}
 }
@@ -187,6 +197,8 @@ func applyFileConfig(path string, raw *rawServerConfig, source *rawServerConfigS
 	applyFileString(&source.AuditURL, &raw.AuditURL, file.AuditURL)
 	applyFileString(&source.CryptoKey, &raw.CryptoKey, file.CryptoKey)
 	applyFileString(&source.GRPCAddress, &raw.GRPCAddress, file.GRPCAddress)
+	applyFileString(&source.GRPCCertFile, &raw.GRPCCertFile, file.GRPCCertFile)
+	applyFileString(&source.GRPCKeyFile, &raw.GRPCKeyFile, file.GRPCKeyFile)
 	applyFileString(&source.TrustedSubnet, &raw.TrustedSubnet, file.TrustedSubnet)
 	applyFileBool(&source.Restore, &raw.Restore, file.Restore)
 
@@ -239,6 +251,8 @@ func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, ar
 	fs.StringVar(&raw.AuditURL, "audit-url", raw.AuditURL, "URL to send audit events to (audit disabled if empty)")
 	fs.StringVar(&raw.CryptoKey, "crypto-key", raw.CryptoKey, "path to RSA private key PEM file (decryption disabled if empty)")
 	fs.StringVar(&raw.GRPCAddress, "grpc-address", raw.GRPCAddress, "gRPC server address (gRPC disabled if empty)")
+	fs.StringVar(&raw.GRPCCertFile, "grpc-cert", raw.GRPCCertFile, "path to TLS certificate PEM file for gRPC server")
+	fs.StringVar(&raw.GRPCKeyFile, "grpc-key", raw.GRPCKeyFile, "path to TLS private key PEM file for gRPC server")
 	fs.StringVar(&raw.TrustedSubnet, "t", raw.TrustedSubnet, "trusted subnet in CIDR notation (check disabled if empty)")
 	fs.StringVar(&configPath, "c", configPath, "path to JSON config file")
 	fs.StringVar(&configPath, "config", configPath, "path to JSON config file")
@@ -269,6 +283,10 @@ func parseServerFlags(raw *rawServerConfig, rawSource *rawServerConfigSource, ar
 			rawSource.CryptoKey = ValueSourceFlag
 		case "grpc-address":
 			rawSource.GRPCAddress = ValueSourceFlag
+		case "grpc-cert":
+			rawSource.GRPCCertFile = ValueSourceFlag
+		case "grpc-key":
+			rawSource.GRPCKeyFile = ValueSourceFlag
 		case "t":
 			rawSource.TrustedSubnet = ValueSourceFlag
 		}
@@ -297,6 +315,8 @@ func markEnvSources(sources *rawServerConfigSource) {
 	markEnv("AUDIT_URL", &sources.AuditURL)
 	markEnv("CRYPTO_KEY", &sources.CryptoKey)
 	markEnv("GRPC_ADDRESS", &sources.GRPCAddress)
+	markEnv("GRPC_CERT_FILE", &sources.GRPCCertFile)
+	markEnv("GRPC_KEY_FILE", &sources.GRPCKeyFile)
 	markEnv("TRUSTED_SUBNET", &sources.TrustedSubnet)
 }
 
@@ -339,6 +359,8 @@ func buildServerConfig(raw *rawServerConfig, source *rawServerConfigSource) (*Se
 		AuditURL:        raw.AuditURL,
 		CryptoKey:       raw.CryptoKey,
 		GRPCAddress:     raw.GRPCAddress,
+		GRPCCertFile:    raw.GRPCCertFile,
+		GRPCKeyFile:     raw.GRPCKeyFile,
 		TrustedSubnet:   raw.TrustedSubnet,
 	}, nil
 }

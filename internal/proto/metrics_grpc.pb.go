@@ -29,7 +29,6 @@ const (
 // MetricsService определяет сервис для работы с метриками.
 type MetricsClient interface {
 	// UpdateMetrics обновляет метрики на сервере.
-	// Этот метод подходит для отправки как единичных метрик, так и батчей.
 	UpdateMetrics(ctx context.Context, in *UpdateMetricsRequest, opts ...grpc.CallOption) (*UpdateMetricsResponse, error)
 }
 
@@ -58,7 +57,6 @@ func (c *metricsClient) UpdateMetrics(ctx context.Context, in *UpdateMetricsRequ
 // MetricsService определяет сервис для работы с метриками.
 type MetricsServer interface {
 	// UpdateMetrics обновляет метрики на сервере.
-	// Этот метод подходит для отправки как единичных метрик, так и батчей.
 	UpdateMetrics(context.Context, *UpdateMetricsRequest) (*UpdateMetricsResponse, error)
 	mustEmbedUnimplementedMetricsServer()
 }

@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/a-aleesshin/metrics/internal/agent/application/dto"
+	"github.com/a-aleesshin/metrics/internal/platform/grpccreds"
 	pb "github.com/a-aleesshin/metrics/internal/proto"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -25,9 +25,14 @@ type MetricSender struct {
 	timeout time.Duration
 }
 
-func NewMetricSender(address string, opts ...grpc.DialOption) (*MetricSender, error) {
+func NewMetricSender(address, caFile string, opts ...grpc.DialOption) (*MetricSender, error) {
+	creds, err := grpccreds.Client(caFile)
+	if err != nil {
+		return nil, err
+	}
+
 	dialOpts := append(
-		[]grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		[]grpc.DialOption{grpc.WithTransportCredentials(creds)},
 		opts...,
 	)
 
@@ -75,7 +80,9 @@ func (s *MetricSender) SendBatch(metrics []dto.MetricDTO) error {
 		ctx = metadata.AppendToOutgoingContext(ctx, pb.RealIPMetadataKey, s.localIP)
 	}
 
-	if _, err := s.client.UpdateMetrics(ctx, &pb.UpdateMetricsRequest{Metrics: payload}); err != nil {
+	request := pb.UpdateMetricsRequest_builder{Metrics: payload}.Build()
+
+	if _, err := s.client.UpdateMetrics(ctx, request); err != nil {
 		return fmt.Errorf("send metrics batch: %w", err)
 	}
 
@@ -94,7 +101,7 @@ func toProtoMetric(metric dto.MetricDTO) (*pb.Metric, error) {
 			value = 0
 		}
 
-		return &pb.Metric{Id: metric.Name, Type: pb.Metric_GAUGE, Value: value}, nil
+		return pb.Metric_builder{Id: metric.Name, Type: pb.Metric_GAUGE, Value: value}.Build(), nil
 
 	case "counter":
 		delta, err := strconv.ParseInt(metric.Value, 10, 64)
@@ -102,7 +109,7 @@ func toProtoMetric(metric dto.MetricDTO) (*pb.Metric, error) {
 			return nil, fmt.Errorf("invalid counter value %q: %w", metric.Value, err)
 		}
 
-		return &pb.Metric{Id: metric.Name, Type: pb.Metric_COUNTER, Delta: delta}, nil
+		return pb.Metric_builder{Id: metric.Name, Type: pb.Metric_COUNTER, Delta: delta}.Build(), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported metric type: %s", metric.Type)
